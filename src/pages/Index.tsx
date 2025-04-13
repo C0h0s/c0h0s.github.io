@@ -1,11 +1,9 @@
 
 import React, { useEffect } from 'react';
-import HeroSection from '@/components/HeroSection';
 import Navbar from '@/components/Navbar';
-import GamesGrid from '@/components/GamesGrid';
-import FeaturedSection from '@/components/FeaturedSection';
-import TrendingNow from '@/components/TrendingNow';
+import GameCard from '@/components/GameCard';
 import Footer from '@/components/Footer';
+import { games } from '@/data/games';
 
 // Helper function to handle scroll animations
 const setupScrollAnimations = () => {
@@ -35,24 +33,25 @@ const Index = () => {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       
-      <main className="pt-16">
-        {/* Hero Section */}
-        <HeroSection />
-        
-        <div className="grid grid-cols-1 lg:grid-cols-4 lg:gap-8 container mx-auto py-12 px-4">
-          <div className="lg:col-span-3">
-            {/* Games Grid */}
-            <GamesGrid />
-          </div>
+      <main className="pt-24 pb-12 px-4">
+        <div className="container mx-auto">
+          <h1 className="text-4xl font-bold text-center mb-12 text-gaming-purple reveal">
+            c0h0s games
+          </h1>
           
-          <div className="lg:col-span-1">
-            {/* Trending Now Section */}
-            <TrendingNow />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 reveal">
+            {games.map((game, index) => (
+              <GameCard
+                key={game.id}
+                id={game.id}
+                title={game.title}
+                thumbnail={game.thumbnail}
+                category={game.category}
+                delay={index * 100}
+              />
+            ))}
           </div>
         </div>
-        
-        {/* Featured Game Section */}
-        <FeaturedSection />
       </main>
       
       <Footer />

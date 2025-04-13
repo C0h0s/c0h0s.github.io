@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Play } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 interface GameCardProps {
@@ -14,6 +14,12 @@ interface GameCardProps {
 
 const GameCard = ({ id, title, thumbnail, category, delay = 0 }: GameCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
+  const navigate = useNavigate();
+
+  const handlePlay = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(`/play/${id}`);
+  };
 
   return (
     <div 
@@ -34,7 +40,12 @@ const GameCard = ({ id, title, thumbnail, category, delay = 0 }: GameCardProps) 
           
           <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300"
                style={{ opacity: isHovered ? 1 : 0 }}>
-            <Button variant="default" size="lg" className="bg-gaming-purple/90 hover:bg-gaming-purple">
+            <Button 
+              variant="default" 
+              size="lg" 
+              className="bg-gaming-purple/90 hover:bg-gaming-purple"
+              onClick={handlePlay}
+            >
               <Play className="mr-2 h-5 w-5" /> Play Now
             </Button>
           </div>
