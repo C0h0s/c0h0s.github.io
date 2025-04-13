@@ -93,8 +93,12 @@ const Navbar = () => {
           <div className="relative">
             <div 
               className={`flex items-center bg-secondary rounded-full overflow-hidden transition-all duration-300 ${searchOpen ? 'w-64' : 'w-10'}`}
+              onClick={() => !searchOpen && setSearchOpen(true)}
             >
-              <button className="p-2 text-white">
+              <button 
+                className="p-2 text-white"
+                onClick={() => !searchOpen && setSearchOpen(true)}
+              >
                 <Search size={20} />
               </button>
               {searchOpen && (
@@ -106,6 +110,11 @@ const Navbar = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
+                    onBlur={() => {
+                      if (searchQuery === '') {
+                        setSearchOpen(false);
+                      }
+                    }}
                   />
                 </>
               )}

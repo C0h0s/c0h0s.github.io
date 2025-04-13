@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -62,7 +63,7 @@
   }
   
   a, button, [role="button"] {
-    @apply cursor-none;
+    @apply cursor-pointer;
   }
 }
 
