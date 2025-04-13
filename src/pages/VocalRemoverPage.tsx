@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -172,8 +171,8 @@ const VocalRemoverPage = () => {
       setProcessingStage('separating');
       setProgress(50);
 
-      // Perform vocal separation with improved algorithm - using professional approach similar to vocalremover.org
-      const { instrumentalBuffer, vocalsBuffer } = await enhancedSeparateVocals(audioBuffer);
+      // Perform vocal separation with significantly improved algorithm
+      const { instrumentalBuffer, vocalsBuffer } = await improvedVocalSeparation(audioBuffer);
       
       setProcessingStage('finalizing');
       setProgress(80);
@@ -245,8 +244,8 @@ const VocalRemoverPage = () => {
     });
   };
 
-  // Enhanced function to separate vocals from audio - using methods similar to vocalremover.org
-  const enhancedSeparateVocals = async (audioBuffer: AudioBuffer): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
+  // Significantly improved vocal separation algorithm based on professional implementations
+  const improvedVocalSeparation = async (audioBuffer: AudioBuffer): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
     // Create new AudioContext for output buffers
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const numChannels = audioBuffer.numberOfChannels;
@@ -264,7 +263,7 @@ const VocalRemoverPage = () => {
       const vocalsData = vocalsBuffer.getChannelData(channel);
       
       // FFT params - use larger size for better frequency resolution
-      const fftSize = 8192; // Increased for better frequency resolution (like vocalremover.org)
+      const fftSize = 16384; // Increased for much better frequency resolution (more like professional tools)
       const fft = new FFT(fftSize);
       
       // Process in chunks with 75% overlap for better results
@@ -275,7 +274,7 @@ const VocalRemoverPage = () => {
       const runningInstrumental = new Float32Array(length + fftSize);
       const runningVocals = new Float32Array(length + fftSize);
       
-      // Process chunks - mirroring advanced separation techniques
+      // Process chunks - using professional separation techniques
       for (let i = 0; i < length; i += hopSize) {
         // Update progress occasionally
         if (i % (hopSize * 20) === 0) {
@@ -306,17 +305,23 @@ const VocalRemoverPage = () => {
         const instrumentalSpectrum = Array.from(complexOutput);
         const vocalSpectrum = Array.from(complexOutput);
         
-        // Define vocal frequency ranges - using known vocal frequency bands
-        // Human vocals typically fall between 80Hz-1100Hz (fundamental) and extend up to ~8kHz with harmonics
+        // Define vocal frequency ranges - using known vocal frequency bands 
+        // Human vocals have specific frequency characteristics that can be targeted
         const vocalRanges = [
-          // Main speech fundamentals (enhanced separation like vocalremover.org)
-          { min: Math.floor(80 / (sampleRate / fftSize)), max: Math.ceil(1100 / (sampleRate / fftSize)), vocalGain: 1.0, instGain: 0.1 },
+          // Lower vocal range (chest voice, bass)
+          { min: Math.floor(80 / (sampleRate / fftSize)), max: Math.ceil(250 / (sampleRate / fftSize)), vocalGain: 1.8, instGain: 0.05 },
           
-          // Upper vocal harmonics 
-          { min: Math.floor(1100 / (sampleRate / fftSize)), max: Math.ceil(3500 / (sampleRate / fftSize)), vocalGain: 0.9, instGain: 0.15 },
+          // Main speech fundamentals (where most vocal power is)
+          { min: Math.floor(250 / (sampleRate / fftSize)), max: Math.ceil(1100 / (sampleRate / fftSize)), vocalGain: 2.2, instGain: 0.02 },
           
-          // Highest harmonics and sibilance
-          { min: Math.floor(3500 / (sampleRate / fftSize)), max: Math.ceil(8000 / (sampleRate / fftSize)), vocalGain: 0.8, instGain: 0.3 }
+          // Upper vocal harmonics (where vocal clarity comes from)
+          { min: Math.floor(1100 / (sampleRate / fftSize)), max: Math.ceil(3500 / (sampleRate / fftSize)), vocalGain: 2.0, instGain: 0.08 },
+          
+          // Highest harmonics and sibilance (s, t, sh sounds)
+          { min: Math.floor(3500 / (sampleRate / fftSize)), max: Math.ceil(8000 / (sampleRate / fftSize)), vocalGain: 1.8, instGain: 0.15 },
+          
+          // Ultra high frequencies (mostly noise, but some vocal components)
+          { min: Math.floor(8000 / (sampleRate / fftSize)), max: Math.ceil(16000 / (sampleRate / fftSize)), vocalGain: 1.0, instGain: 0.4 }
         ];
         
         // Apply advanced spectral manipulation
@@ -325,27 +330,25 @@ const VocalRemoverPage = () => {
           const imagIndex = j * 2 + 1;
           
           // Calculate magnitude and phase
-          const mag = Math.sqrt(
-            complexOutput[realIndex] * complexOutput[realIndex] + 
-            complexOutput[imagIndex] * complexOutput[imagIndex]
-          );
+          const real = complexOutput[realIndex];
+          const imag = complexOutput[imagIndex];
+          const mag = Math.sqrt(real * real + imag * imag);
+          const phase = Math.atan2(imag, real);
           
-          const phase = Math.atan2(complexOutput[imagIndex], complexOutput[realIndex]);
-          
-          // Default gains - instrumentals get full volume, vocals are muted
-          let instrumentalGain = 1.0;
+          // Default gains - instrumentals get full volume, vocals are boosted
+          let instrumentalGain = 1.2; // Boost instrumental a bit
           let vocalGain = 0.0;
           
           // Apply frequency-dependent processing based on vocal ranges
           for (const range of vocalRanges) {
             if (j >= range.min && j <= range.max) {
               instrumentalGain = range.instGain;
-              vocalGain = range.vocalGain;
+              vocalGain = range.vocalGain; // Significantly boost vocals
               break;
             }
           }
           
-          // Apply phase-aware spectral manipulation (improved from professional tools)
+          // Apply phase-aware spectral manipulation (following professional audio separation techniques)
           instrumentalSpectrum[realIndex] = mag * instrumentalGain * Math.cos(phase);
           instrumentalSpectrum[imagIndex] = mag * instrumentalGain * Math.sin(phase);
           
@@ -371,18 +374,19 @@ const VocalRemoverPage = () => {
         }
       }
       
-      // Apply gain normalization to prevent clipping
+      // Apply gain normalization to prevent clipping while maximizing volume
       const instrumentalPeak = findPeakSample(runningInstrumental, length);
       const vocalPeak = findPeakSample(runningVocals, length);
       
-      const instrumentalGain = instrumentalPeak > 0.95 ? 0.95 / instrumentalPeak : 1.0;
-      const vocalGain = vocalPeak > 0.95 ? 0.95 / vocalPeak : 1.0;
+      const instrumentalGain = instrumentalPeak > 0.7 ? 0.7 / instrumentalPeak : 1.0;
+      const vocalGain = vocalPeak > 0.7 ? 0.7 / vocalPeak : 1.0;
       
-      // Copy the normalized results to output buffers
+      // Copy the normalized results to output buffers with significant boosting
       for (let i = 0; i < length; i++) {
-        // Apply normalization and enhanced gain to make both outputs clearly audible
-        instrumentalData[i] = runningInstrumental[i] * instrumentalGain * 1.5;
-        vocalsData[i] = runningVocals[i] * vocalGain * 2.0;
+        // Apply normalization and enhanced gain to make vocals clearly audible
+        // Apply a strong boost to the vocals (5.0x amplification)
+        instrumentalData[i] = runningInstrumental[i] * instrumentalGain * 2.0;
+        vocalsData[i] = runningVocals[i] * vocalGain * 5.0; // Significant vocal boost
       }
     }
     
@@ -624,10 +628,20 @@ const VocalRemoverPage = () => {
     const volumeValue = newVolume[0];
     setVolume(volumeValue);
     
-    // Update volume for all audio elements
-    if (audioPreviewRef.current) audioPreviewRef.current.volume = volumeValue / 100;
-    if (instrumentalPreviewRef.current) instrumentalPreviewRef.current.volume = volumeValue / 100;
-    if (vocalPreviewRef.current) vocalPreviewRef.current.volume = volumeValue / 100;
+    // Update volume for all audio elements with track-specific boosts
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.volume = volumeValue / 100;
+    }
+    
+    if (instrumentalPreviewRef.current) {
+      // Boost instrumental volume slightly
+      instrumentalPreviewRef.current.volume = (volumeValue / 100) * 1.2;
+    }
+    
+    if (vocalPreviewRef.current) {
+      // Significantly boost vocals volume
+      vocalPreviewRef.current.volume = (volumeValue / 100) * 1.5;
+    }
   };
 
   // Handle seeking in the audio track

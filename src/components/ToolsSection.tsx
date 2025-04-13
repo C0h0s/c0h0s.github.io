@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Headphones, ArrowRight } from 'lucide-react';
+import { Headphones, ArrowRight, AudioWaveform } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,7 +14,7 @@ const ToolsSection = () => {
     id: 'vocal-remover',
     title: 'Vocal Remover',
     description: 'Remove vocals from your music files to create instrumentals and karaoke tracks.',
-    icon: <Headphones size={24} />,
+    icon: <AudioWaveform size={24} />,
     path: '/vocalremover',
     color: 'from-purple-500 to-pink-500'
   };
@@ -52,7 +52,7 @@ const ToolsSection = () => {
       <div className="container mx-auto">
         <div className="text-left mb-8 reveal">
           <h2 className="text-2xl font-bold text-white">Tools</h2>
-          <p className="text-muted-foreground">Useful utilities to enhance your experience</p>
+          <p className="text-muted-foreground">Enhance your music with our specialized tools</p>
         </div>
 
         <div className="flex justify-center">
