@@ -11,13 +11,11 @@ const CustomCursor = () => {
     if (!cursor || !cursorOuter) return;
     
     const onMouseMove = (e: MouseEvent) => {
-      // Use transform instead of left/top for better performance and reduced delay
+      // Direct positioning for inner cursor - no delay
       cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
       
-      // Use requestAnimationFrame to make the outer cursor follow with slight delay
-      requestAnimationFrame(() => {
-        cursorOuter.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
-      });
+      // Minimal delay for outer cursor using direct style changes instead of requestAnimationFrame
+      cursorOuter.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
     };
     
     const onMouseDown = () => {
@@ -67,12 +65,12 @@ const CustomCursor = () => {
     <>
       <div 
         ref={cursorOuterRef} 
-        className="fixed w-8 h-8 rounded-full bg-white/10 pointer-events-none z-[9999] transition-transform duration-150 border border-white/20"
+        className="fixed w-8 h-8 rounded-full bg-white/10 pointer-events-none z-[9999] transition-transform duration-75 border border-white/20"
         style={{ transform: 'translate3d(0px, 0px, 0) translate(-50%, -50%)' }}
       />
       <div 
         ref={cursorRef} 
-        className="fixed w-4 h-4 rounded-full bg-white/30 pointer-events-none z-[9999] transition-all duration-100"
+        className="fixed w-4 h-4 rounded-full bg-white/30 pointer-events-none z-[9999] transition-all duration-50"
         style={{ transform: 'translate3d(0px, 0px, 0) translate(-50%, -50%)' }}
       />
     </>
