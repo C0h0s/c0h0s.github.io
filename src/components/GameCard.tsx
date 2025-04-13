@@ -35,16 +35,16 @@ const GameCard = ({ id, title, thumbnail, category, delay }: GameCardProps) => {
       transition={{ delay: delay / 1000 }}
       onClick={openGameInNewTab}
     >
-      <div className="aspect-[3/4] rounded-xl overflow-hidden relative">
+      <div className="aspect-[4/3] rounded-lg overflow-hidden relative">
         <img 
           src={thumbnail} 
           alt={title} 
           className="w-full h-full object-cover transition-transform duration-500"
         />
         <div className="game-card-gradient"></div>
-        <div className="absolute bottom-0 left-0 p-4 w-full">
+        <div className="absolute bottom-0 left-0 p-3 w-full">
           <p className="text-xs font-medium text-white/70 mb-1">{category}</p>
-          <h3 className="text-lg font-bold text-white">{title}</h3>
+          <h3 className="text-base font-bold text-white">{title}</h3>
         </div>
       </div>
     </motion.div>

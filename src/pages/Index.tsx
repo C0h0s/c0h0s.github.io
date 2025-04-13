@@ -45,17 +45,26 @@ const Index = () => {
       
       <main className="pt-24 pb-12 px-4">
         <div className="container mx-auto">
-          <motion.h1 
+          <motion.div 
             initial="hidden"
             animate="visible"
             variants={titleVariants}
-            className="text-4xl font-bold text-center mb-12 text-gaming-purple"
+            className="flex flex-col items-center justify-center mb-12"
           >
-            c0h0s games
-          </motion.h1>
+            <div className="w-16 h-16 rounded-full overflow-hidden mb-4">
+              <img 
+                src="https://cdn.discordapp.com/avatars/787701539174613022/70fa0aa8ca6d6e2568252e57d32d1b98.webp?size=1024&format=webp"
+                alt="c0h0s games"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <h1 className="text-4xl font-bold text-center text-gaming-purple">
+              c0h0s games
+            </h1>
+          </motion.div>
           
           <motion.div 
-            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
