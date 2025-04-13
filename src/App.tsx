@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
 import LoadingScreen from "./components/LoadingScreen";
+import VocalRemoverPage from "./pages/VocalRemoverPage";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/game/:gameId" element={<GameDetail />} />
+              <Route path="/vocalremover" element={<VocalRemoverPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </HashRouter>

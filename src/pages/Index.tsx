@@ -1,10 +1,11 @@
+
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import GameCard from '@/components/GameCard';
 import { games } from '@/data/games';
 import { motion } from 'framer-motion';
 import BackgroundParticles from '@/components/BackgroundParticles';
-import MostPlayedGames from '@/components/MostPlayedGames';
+import ToolsSection from '@/components/ToolsSection';
 
 const Index = () => {
   // Animation variants
@@ -55,7 +56,7 @@ const Index = () => {
         </div>
       </main>
       
-      <MostPlayedGames />
+      <ToolsSection />
     </div>
   );
 };
