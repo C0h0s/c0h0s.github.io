@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 
-// FFT.js for audio frequency analysis
+// Import for more efficient audio processing
 import FFT from 'fft.js';
 
 type ProcessingStage = 'idle' | 'uploading' | 'analyzing' | 'separating' | 'finalizing' | 'complete';
@@ -119,8 +119,8 @@ const VocalRemoverPage = () => {
       setProcessingStage('separating');
       setProgress(50);
 
-      // Perform vocal separation
-      const { instrumentalBuffer, vocalsBuffer } = await separateVocals(audioBuffer);
+      // Perform vocal separation with improved algorithm
+      const { instrumentalBuffer, vocalsBuffer } = await improvedSeparateVocals(audioBuffer);
       
       setProcessingStage('finalizing');
       setProgress(80);
@@ -187,15 +187,15 @@ const VocalRemoverPage = () => {
     });
   };
 
-  // Function to separate vocals from audio
-  const separateVocals = async (audioBuffer: AudioBuffer): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
-    // Basic vocal separation using frequency filtering
+  // Improved function to separate vocals from audio
+  const improvedSeparateVocals = async (audioBuffer: AudioBuffer): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
+    // Create new AudioContext for output buffers
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const numChannels = audioBuffer.numberOfChannels;
     const length = audioBuffer.length;
     const sampleRate = audioBuffer.sampleRate;
     
-    // Create new AudioBuffers for the separated audio
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Create output buffers
     const instrumentalBuffer = audioContext.createBuffer(numChannels, length, sampleRate);
     const vocalsBuffer = audioContext.createBuffer(numChannels, length, sampleRate);
     
@@ -205,55 +205,93 @@ const VocalRemoverPage = () => {
       const instrumentalData = instrumentalBuffer.getChannelData(channel);
       const vocalsData = vocalsBuffer.getChannelData(channel);
       
-      // FFT params
-      const fftSize = 2048;
+      // FFT params - larger size for better frequency resolution
+      const fftSize = 4096; // Increased from 2048 for better resolution
       const fft = new FFT(fftSize);
-      const halfSize = fftSize / 2;
       
-      // Process in chunks
-      for (let i = 0; i < length; i += fftSize) {
+      // Process in chunks with overlap (75% overlap for smoother results)
+      const hopSize = Math.floor(fftSize / 4); 
+      const window = createHannWindow(fftSize);
+      
+      // Create arrays for overlap-add
+      const runningInstrumental = new Float32Array(length + fftSize);
+      const runningVocals = new Float32Array(length + fftSize);
+      
+      // Process chunks
+      for (let i = 0; i < length; i += hopSize) {
         // Create chunk with zero padding if needed
         const chunk = new Float32Array(fftSize);
         for (let j = 0; j < fftSize; j++) {
-          chunk[j] = i + j < length ? inputData[i + j] : 0;
-        }
-        
-        // Apply window function (Hann)
-        for (let j = 0; j < fftSize; j++) {
-          chunk[j] *= 0.5 * (1 - Math.cos(2 * Math.PI * j / fftSize));
+          if (i + j < length) {
+            // Apply window function to reduce artifacts
+            chunk[j] = inputData[i + j] * window[j];
+          }
         }
         
         // Prepare for FFT
-        const complexInput = new Array(fftSize * 2);
+        const complexInput = fft.createComplexArray();
         for (let j = 0; j < fftSize; j++) {
-          complexInput[2 * j] = chunk[j];
-          complexInput[2 * j + 1] = 0;
+          complexInput[2 * j] = chunk[j]; // Real part
+          complexInput[2 * j + 1] = 0;    // Imaginary part
         }
         
-        // Perform FFT
+        // Perform forward FFT
         const complexOutput = fft.createComplexArray();
         fft.transform(complexOutput, complexInput);
         
-        // Apply vocal/instrumental separation in frequency domain
-        // Human voice is typically in 80-255 Hz range (fundamental)
-        const vocalRange = { min: Math.floor(80 / sampleRate * fftSize), max: Math.ceil(255 / sampleRate * fftSize) };
+        // Create copies for separate processing
+        const instrumentalSpectrum = Array.from(complexOutput);
+        const vocalSpectrum = Array.from(complexOutput);
         
-        // Copy complexOutput to separate arrays for manipulation
-        const instrumentalSpectrum = [...complexOutput];
-        const vocalSpectrum = [...complexOutput];
+        // Apply spectral masks based on frequency ranges
+        const vocalRange = {
+          min: Math.floor(200 / (sampleRate / fftSize)),  // 200 Hz
+          max: Math.ceil(8000 / (sampleRate / fftSize))   // 8000 Hz
+        };
         
-        // Filter spectrums
-        for (let j = 0; j < fftSize; j++) {
-          const idx = j * 2;
+        // Enhanced vocal detection - focus on mid-range frequencies
+        const midVocalRange = {
+          min: Math.floor(400 / (sampleRate / fftSize)),  // 400 Hz
+          max: Math.ceil(4000 / (sampleRate / fftSize))   // 4000 Hz
+        };
+        
+        // Apply different masks for different frequency ranges
+        for (let j = 0; j < fftSize / 2; j++) {
+          const realIndex = j * 2;
+          const imagIndex = j * 2 + 1;
           
-          // Suppress vocal frequency range in instrumental
-          if (j > vocalRange.min && j < vocalRange.max) {
-            instrumentalSpectrum[idx] *= 0.2;     // Real part
-            instrumentalSpectrum[idx + 1] *= 0.2; // Imaginary part
-          } else {
-            vocalSpectrum[idx] *= 0.3;      // Real part
-            vocalSpectrum[idx + 1] *= 0.3;  // Imaginary part
+          // Get magnitude
+          const mag = Math.sqrt(
+            complexOutput[realIndex] * complexOutput[realIndex] + 
+            complexOutput[imagIndex] * complexOutput[imagIndex]
+          );
+          
+          // Phase
+          const phase = Math.atan2(complexOutput[imagIndex], complexOutput[realIndex]);
+          
+          let instrumentalGain = 1.0;
+          let vocalGain = 0.1; // Slight background vocals in instrumental
+          
+          // Main vocal frequencies
+          if (j > midVocalRange.min && j < midVocalRange.max) {
+            // Stronger separation for mid-vocal range
+            instrumentalGain = 0.1; 
+            vocalGain = 1.0;
           }
+          // Extended vocal range
+          else if (j > vocalRange.min && j < vocalRange.max) {
+            instrumentalGain = 0.3;
+            vocalGain = 0.8;
+          }
+          
+          // Apply gains to magnitude and convert back to real/imag
+          // Instrumental
+          instrumentalSpectrum[realIndex] = mag * instrumentalGain * Math.cos(phase);
+          instrumentalSpectrum[imagIndex] = mag * instrumentalGain * Math.sin(phase);
+          
+          // Vocals
+          vocalSpectrum[realIndex] = mag * vocalGain * Math.cos(phase);
+          vocalSpectrum[imagIndex] = mag * vocalGain * Math.sin(phase);
         }
         
         // Inverse FFT for instrumental
@@ -264,17 +302,33 @@ const VocalRemoverPage = () => {
         const vocalOutput = fft.createComplexArray();
         fft.inverseTransform(vocalOutput, vocalSpectrum);
         
-        // Copy result back to output buffers with overlap-add
+        // Overlap-add to output buffers
         for (let j = 0; j < fftSize; j++) {
-          if (i + j < length) {
-            instrumentalData[i + j] = instrumentalOutput[j * 2] / fftSize;
-            vocalsData[i + j] = vocalOutput[j * 2] / fftSize;
+          if (i + j < length + fftSize) {
+            // Scale by FFT size and apply window again for overlap-add
+            runningInstrumental[i + j] += (instrumentalOutput[j * 2] / fftSize) * window[j];
+            runningVocals[i + j] += (vocalOutput[j * 2] / fftSize) * window[j];
           }
         }
+      }
+      
+      // Copy the results to output buffers
+      for (let i = 0; i < length; i++) {
+        instrumentalData[i] = runningInstrumental[i];
+        vocalsData[i] = runningVocals[i];
       }
     }
     
     return { instrumentalBuffer, vocalsBuffer };
+  };
+  
+  // Create Hann window function
+  const createHannWindow = (size: number): Float32Array => {
+    const window = new Float32Array(size);
+    for (let i = 0; i < size; i++) {
+      window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (size - 1)));
+    }
+    return window;
   };
 
   // Utility function to convert AudioBuffer to WAV Blob
@@ -325,7 +379,9 @@ const VocalRemoverPage = () => {
       
       for (let i = 0; i < length; i++) {
         for (let channel = 0; channel < numChannels; channel++) {
-          const sample = audioBuffer.getChannelData(channel)[i] * volume;
+          let sample = audioBuffer.getChannelData(channel)[i] * volume;
+          // Boost the volume slightly for better audibility
+          sample *= 1.2;
           // Clamp between -1 and 1
           const clampedSample = Math.max(-1, Math.min(1, sample));
           // Convert to 16-bit signed integer
