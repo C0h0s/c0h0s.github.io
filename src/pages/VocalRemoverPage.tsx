@@ -254,15 +254,15 @@ const VocalRemoverPage = () => {
         
         if (audioPreviewRef.current) {
           audioPreviewRef.current.src = originalUrl;
-          audioPreviewRef.current.volume = volume / 100;
+          audioPreviewRef.current.volume = Math.min(volume / 100, 1.0);
         }
         if (instrumentalPreviewRef.current) {
           instrumentalPreviewRef.current.src = instrumentalUrl;
-          instrumentalPreviewRef.current.volume = volume / 100 * 1.5; // Boost instrumental volume
+          instrumentalPreviewRef.current.volume = Math.min((volume / 100) * 1.0, 1.0);
         }
         if (vocalPreviewRef.current) {
           vocalPreviewRef.current.src = vocalsUrl;
-          vocalPreviewRef.current.volume = volume / 100 * 8.0; // Greatly boost vocals volume
+          vocalPreviewRef.current.volume = Math.min((volume / 100) * 1.0, 1.0);
         }
         
         setProcessingStage('complete');
@@ -614,7 +614,7 @@ const VocalRemoverPage = () => {
       for (let i = 0; i < length; i++) {
         // Apply huge boost to vocals (12x) - professional tools use specialized machine learning
         // for this, but our spectral approach needs this boost to be clearly audible
-        vocalsData[i] *= 12.0;
+        vocalsData[i] *= 50.0; // Increase the multiplier for vocals
         
         // Reduce any potential artifacts by soft clipping
         vocalsData[i] = softClip(vocalsData[i], 0.95);
@@ -635,13 +635,13 @@ const VocalRemoverPage = () => {
       for (let i = 0; i < length; i++) {
         // Enhance the common/center content for vocals
         const commonContent = (leftVocal[i] + rightVocal[i]) / 2;
-        leftVocal[i] = commonContent * 1.8; // Boost center channel for vocals
-        rightVocal[i] = commonContent * 1.8;
+        leftVocal[i] = commonContent * 5.0; // Increase center channel boost for vocals
+        rightVocal[i] = commonContent * 5.0;
         
         // Enhance the difference content for instrumentals
         const diffContent = (leftInst[i] - rightInst[i]) / 2;
-        leftInst[i] += diffContent * 0.5;
-        rightInst[i] -= diffContent * 0.5;
+        leftInst[i] += diffContent * 0.8; // Increase stereo width for instrumentals
+        rightInst[i] -= diffContent * 0.8;
       }
     }
     
@@ -880,13 +880,13 @@ const VocalRemoverPage = () => {
       // Set the position to match the previous track
       audioElement.currentTime = currentPos;
       
-      // Apply appropriate volume boost based on track type
+      // Apply appropriate volume boost based on track type, ensuring it's within 0-1 range
       if (value === 'vocals') {
-        audioElement.volume = volume / 100 * 8.0; // 8x boost for vocals
+        audioElement.volume = Math.min((volume / 100) * 1.0, 1.0);
       } else if (value === 'instrumental') {
-        audioElement.volume = volume / 100 * 1.5; // 1.5x boost for instrumentals
+        audioElement.volume = Math.min((volume / 100) * 1.0, 1.0);
       } else {
-        audioElement.volume = volume / 100; // Normal volume for original
+        audioElement.volume = Math.min(volume / 100, 1.0);
       }
       
       // Resume playback if it was playing before
@@ -905,19 +905,19 @@ const VocalRemoverPage = () => {
     const volumeValue = newVolume[0];
     setVolume(volumeValue);
     
-    // Update volume for all audio elements with track-specific boosts
+    // Update volume for all audio elements with track-specific boosts, but ensure within 0-1 range
     if (audioPreviewRef.current) {
-      audioPreviewRef.current.volume = volumeValue / 100;
+      audioPreviewRef.current.volume = Math.min(volumeValue / 100, 1.0);
     }
     
     if (instrumentalPreviewRef.current) {
-      // Boost instrumental volume significantly
-      instrumentalPreviewRef.current.volume = (volumeValue / 100) * 1.5;
+      // Boost instrumental volume but ensure it's within 0-1 range
+      instrumentalPreviewRef.current.volume = Math.min((volumeValue / 100) * 1.0, 1.0);
     }
     
     if (vocalPreviewRef.current) {
-      // Extremely boost vocals volume (8x)
-      vocalPreviewRef.current.volume = (volumeValue / 100) * 8.0;
+      // Boost vocals volume but ensure it's within 0-1 range
+      vocalPreviewRef.current.volume = Math.min((volumeValue / 100) * 1.0, 1.0);
     }
   };
 
