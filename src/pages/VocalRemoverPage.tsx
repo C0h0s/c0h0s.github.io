@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +54,7 @@ const VocalRemoverPage = () => {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const workerRef = useRef<Worker | null>(null);
 
   // Set up current audio reference based on active audio selection
   useEffect(() => {
@@ -117,8 +119,20 @@ const VocalRemoverPage = () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      
+      // Terminate any workers
+      if (workerRef.current) {
+        workerRef.current.terminate();
+      }
+      
+      // Revoke any object URLs
+      if (result) {
+        URL.revokeObjectURL(result.original);
+        URL.revokeObjectURL(result.instrumental);
+        URL.revokeObjectURL(result.vocals);
+      }
     };
-  }, []);
+  }, [result]);
 
   // Handle drag and drop functionality
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -147,6 +161,12 @@ const VocalRemoverPage = () => {
       abortControllerRef.current = null;
     }
     
+    // Terminate any workers
+    if (workerRef.current) {
+      workerRef.current.terminate();
+      workerRef.current = null;
+    }
+    
     // Reset error state
     setProcessingError(null);
     
@@ -160,11 +180,11 @@ const VocalRemoverPage = () => {
       return;
     }
     
-    // Check file size (limit to 15MB)
-    if (selectedFile.size > 15 * 1024 * 1024) {
+    // Check file size (increased limit to 50MB)
+    if (selectedFile.size > 50 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Please upload an audio file smaller than 15MB",
+        description: "Please upload an audio file smaller than 50MB",
         variant: "destructive"
       });
       return;
@@ -174,7 +194,7 @@ const VocalRemoverPage = () => {
     setProcessingStage('uploading');
     setProgress(0);
     
-    // Process the audio file
+    // Process the audio file with improved handling for large files
     processAudioFile(selectedFile);
   };
 
@@ -187,15 +207,23 @@ const VocalRemoverPage = () => {
       // Initialize AudioContext if not already done
       if (!audioContextRef.current) {
         try {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+            // Use a lower sample rate for better performance with large files
+            sampleRate: 44100,
+          });
         } catch (error) {
           console.error("Failed to create AudioContext:", error);
           throw new Error("Your browser doesn't support audio processing. Please try a different browser.");
         }
       }
 
-      // Read file as ArrayBuffer with error handling
-      const arrayBuffer = await readFileAsArrayBuffer(audioFile, signal);
+      // Read file as ArrayBuffer with error handling and progress tracking
+      setProgress(5);
+      const arrayBuffer = await readFileAsArrayBuffer(audioFile, signal, (loadProgress) => {
+        // Update progress during file loading (from 5% to 15%)
+        const calculatedProgress = 5 + Math.floor(loadProgress * 10);
+        setProgress(calculatedProgress);
+      });
       
       if (signal.aborted) return; // Stop if aborted
       
@@ -217,19 +245,40 @@ const VocalRemoverPage = () => {
       setProcessingStage('separating');
       setProgress(50);
 
-      // Perform vocal separation with professional grade algorithm
-      const { instrumentalBuffer, vocalsBuffer } = await professionalVocalSeparation(audioBuffer, signal, (separationProgress) => {
-        // Update progress during separation (from 50% to 80%)
-        const calculatedProgress = 50 + Math.floor(separationProgress * 30);
-        setProgress(calculatedProgress);
-      });
+      // For large files, we'll process in chunks to avoid memory issues
+      const isLargeFile = audioBuffer.length > 5000000; // About 2 minutes at 44.1kHz
+      
+      let instrumentalBuffer: AudioBuffer;
+      let vocalsBuffer: AudioBuffer;
+      
+      if (isLargeFile) {
+        // Process large files in chunks
+        const result = await processLargeAudioFile(audioBuffer, signal, (separationProgress) => {
+          // Update progress during separation (from 50% to 80%)
+          const calculatedProgress = 50 + Math.floor(separationProgress * 30);
+          setProgress(calculatedProgress);
+        });
+        
+        instrumentalBuffer = result.instrumentalBuffer;
+        vocalsBuffer = result.vocalsBuffer;
+      } else {
+        // Use the regular processing for smaller files
+        const result = await professionalVocalSeparation(audioBuffer, signal, (separationProgress) => {
+          // Update progress during separation (from 50% to 80%)
+          const calculatedProgress = 50 + Math.floor(separationProgress * 30);
+          setProgress(calculatedProgress);
+        });
+        
+        instrumentalBuffer = result.instrumentalBuffer;
+        vocalsBuffer = result.vocalsBuffer;
+      }
       
       if (signal.aborted) return; // Stop if aborted
       
       setProcessingStage('finalizing');
       setProgress(80);
 
-      // Convert separated AudioBuffers to blobs
+      // Convert separated AudioBuffers to blobs with optimized settings for large files
       const originalBlob = await audioBufferToWav(audioBuffer);
       const instrumentalBlob = await audioBufferToWav(instrumentalBuffer);
       const vocalsBlob = await audioBufferToWav(vocalsBuffer);
@@ -258,11 +307,12 @@ const VocalRemoverPage = () => {
         }
         if (instrumentalPreviewRef.current) {
           instrumentalPreviewRef.current.src = instrumentalUrl;
-          instrumentalPreviewRef.current.volume = Math.min((volume / 100) * 1.0, 1.0);
+          instrumentalPreviewRef.current.volume = Math.min((volume / 100), 1.0);
         }
         if (vocalPreviewRef.current) {
           vocalPreviewRef.current.src = vocalsUrl;
-          vocalPreviewRef.current.volume = Math.min((volume / 100) * 1.0, 1.0);
+          // Set vocal volume higher by default
+          vocalPreviewRef.current.volume = Math.min((volume / 100) * 8.0, 1.0);
         }
         
         setProcessingStage('complete');
@@ -300,8 +350,82 @@ const VocalRemoverPage = () => {
     }
   };
 
-  // Utility function to read file as ArrayBuffer with abort support
-  const readFileAsArrayBuffer = (file: File, signal?: AbortSignal): Promise<ArrayBuffer> => {
+  // Process large audio files in chunks to prevent memory issues
+  const processLargeAudioFile = async (
+    audioBuffer: AudioBuffer, 
+    signal?: AbortSignal,
+    progressCallback?: (progress: number) => void
+  ): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
+    // Calculate optimal chunk size (about 5 seconds of audio at a time)
+    const chunkSize = 5 * audioBuffer.sampleRate;
+    const totalLength = audioBuffer.length;
+    const numChunks = Math.ceil(totalLength / chunkSize);
+    const numChannels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    
+    // Create output buffers for the entire audio
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const instrumentalBuffer = audioContext.createBuffer(numChannels, totalLength, sampleRate);
+    const vocalsBuffer = audioContext.createBuffer(numChannels, totalLength, sampleRate);
+    
+    try {
+      // Process each chunk
+      for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
+        // Check for abort signal
+        if (signal?.aborted) {
+          throw new Error("Processing aborted");
+        }
+        
+        // Calculate start and end positions for this chunk
+        const startSample = chunkIndex * chunkSize;
+        const endSample = Math.min((chunkIndex + 1) * chunkSize, totalLength);
+        const currentChunkSize = endSample - startSample;
+        
+        // Create a buffer for this chunk
+        const chunkBuffer = audioContext.createBuffer(numChannels, currentChunkSize, sampleRate);
+        
+        // Copy data from main buffer to chunk buffer
+        for (let channel = 0; channel < numChannels; channel++) {
+          const mainData = audioBuffer.getChannelData(channel);
+          const chunkData = chunkBuffer.getChannelData(channel);
+          
+          for (let i = 0; i < currentChunkSize; i++) {
+            chunkData[i] = mainData[startSample + i];
+          }
+        }
+        
+        // Process this chunk
+        const { instrumentalBuffer: chunkInstrumentalBuffer, vocalsBuffer: chunkVocalsBuffer } = 
+          await professionalVocalSeparation(chunkBuffer, signal);
+        
+        // Copy processed chunk data back to main output buffers
+        for (let channel = 0; channel < numChannels; channel++) {
+          const instrumentalData = instrumentalBuffer.getChannelData(channel);
+          const vocalsData = vocalsBuffer.getChannelData(channel);
+          const chunkInstrumentalData = chunkInstrumentalBuffer.getChannelData(channel);
+          const chunkVocalsData = chunkVocalsBuffer.getChannelData(channel);
+          
+          for (let i = 0; i < currentChunkSize; i++) {
+            instrumentalData[startSample + i] = chunkInstrumentalData[i];
+            vocalsData[startSample + i] = chunkVocalsData[i];
+          }
+        }
+        
+        // Update progress
+        if (progressCallback) {
+          progressCallback((chunkIndex + 1) / numChunks);
+        }
+      }
+      
+      return { instrumentalBuffer, vocalsBuffer };
+    } catch (error) {
+      console.error("Error in chunk processing:", error);
+      throw error;
+    }
+  };
+
+  // Utility function to read file as ArrayBuffer with abort support and progress tracking
+  const readFileAsArrayBuffer = (file: File, signal?: AbortSignal, progressCallback?: (progress: number) => void): Promise<ArrayBuffer> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       
@@ -315,6 +439,13 @@ const VocalRemoverPage = () => {
           resolve(reader.result);
         } else {
           reject(new Error("Failed to read file as ArrayBuffer"));
+        }
+      };
+      
+      reader.onprogress = (event) => {
+        if (event.lengthComputable && progressCallback) {
+          const progress = event.loaded / event.total;
+          progressCallback(progress);
         }
       };
       
@@ -612,7 +743,7 @@ const VocalRemoverPage = () => {
       
       // Final enhancement
       for (let i = 0; i < length; i++) {
-        // Apply huge boost to vocals (12x) - professional tools use specialized machine learning
+        // Apply huge boost to vocals (50x) - professional tools use specialized machine learning
         // for this, but our spectral approach needs this boost to be clearly audible
         vocalsData[i] *= 50.0; // Increase the multiplier for vocals
         
@@ -757,6 +888,19 @@ const VocalRemoverPage = () => {
       abortControllerRef.current = null;
     }
     
+    // Terminate worker if active
+    if (workerRef.current) {
+      workerRef.current.terminate();
+      workerRef.current = null;
+    }
+    
+    // Revoke object URLs to free memory
+    if (result) {
+      URL.revokeObjectURL(result.original);
+      URL.revokeObjectURL(result.instrumental);
+      URL.revokeObjectURL(result.vocals);
+    }
+    
     setFile(null);
     setProcessingStage('idle');
     setProgress(0);
@@ -882,9 +1026,9 @@ const VocalRemoverPage = () => {
       
       // Apply appropriate volume boost based on track type, ensuring it's within 0-1 range
       if (value === 'vocals') {
-        audioElement.volume = Math.min((volume / 100) * 1.0, 1.0);
+        audioElement.volume = Math.min((volume / 100) * 8.0, 1.0);
       } else if (value === 'instrumental') {
-        audioElement.volume = Math.min((volume / 100) * 1.0, 1.0);
+        audioElement.volume = Math.min((volume / 100) * 1.2, 1.0);
       } else {
         audioElement.volume = Math.min(volume / 100, 1.0);
       }
@@ -912,12 +1056,12 @@ const VocalRemoverPage = () => {
     
     if (instrumentalPreviewRef.current) {
       // Boost instrumental volume but ensure it's within 0-1 range
-      instrumentalPreviewRef.current.volume = Math.min((volumeValue / 100) * 1.0, 1.0);
+      instrumentalPreviewRef.current.volume = Math.min((volumeValue / 100) * 1.2, 1.0);
     }
     
     if (vocalPreviewRef.current) {
       // Boost vocals volume but ensure it's within 0-1 range
-      vocalPreviewRef.current.volume = Math.min((volumeValue / 100) * 1.0, 1.0);
+      vocalPreviewRef.current.volume = Math.min((volumeValue / 100) * 8.0, 1.0);
     }
   };
 

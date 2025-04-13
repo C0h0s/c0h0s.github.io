@@ -13,7 +13,7 @@ const ToolsSection = () => {
   const tool = {
     id: 'vocal-remover',
     title: 'Professional Vocal Remover',
-    description: 'Remove vocals from your music using advanced AI technology. Create instrumentals and isolate vocal tracks with professional quality.',
+    description: 'Remove vocals from your music using advanced AI technology. Handles large files up to 50MB with high-quality separation and customizable outputs.',
     icon: <AudioWaveform size={24} />,
     path: '/vocalremover',
     color: 'from-purple-500 to-pink-500'
