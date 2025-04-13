@@ -10,11 +10,15 @@ const GamePlayer = () => {
   const { gameId } = useParams();
   const navigate = useNavigate();
   const [game, setGame] = useState(games.find(g => g.id === gameId));
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!game) {
       navigate('/');
     }
+    
+    // Reset loading state when game changes
+    setIsLoading(true);
   }, [game, navigate]);
 
   if (!game) return null;
@@ -37,13 +41,21 @@ const GamePlayer = () => {
           <div className="w-[100px]"></div> {/* Spacer for balance */}
         </div>
         
-        <div className="aspect-video w-full overflow-hidden rounded-lg border border-border">
+        <div className="aspect-video w-full overflow-hidden rounded-lg border border-border relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gaming-dark/70 z-10">
+              <div className="w-16 h-16 border-4 border-gaming-purple/30 border-t-gaming-purple rounded-full animate-spin"></div>
+            </div>
+          )}
           <iframe
             src={game.url}
             title={game.title}
             className="w-full h-full"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             allow="fullscreen; autoplay; encrypted-media"
-            allowFullScreen
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            onLoad={() => setIsLoading(false)}
           ></iframe>
         </div>
       </main>

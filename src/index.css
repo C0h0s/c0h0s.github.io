@@ -43,6 +43,9 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --gaming-purple: rgb(155, 135, 245);
+    --gaming-dark: #1A1F2C;
   }
 }
 
@@ -106,6 +109,19 @@
   .animate-delay-500 {
     animation-delay: 500ms;
   }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s infinite alternate;
+  }
+
+  @keyframes pulse-glow {
+    0% {
+      box-shadow: 0 0 5px rgba(155, 135, 245, 0.5);
+    }
+    100% {
+      box-shadow: 0 0 20px rgba(155, 135, 245, 0.8);
+    }
+  }
 }
 
 #root {
@@ -113,4 +129,22 @@
   margin: 0 auto;
   padding: 0;
   text-align: center;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gaming-purple);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(155, 135, 245, 0.8);
 }
