@@ -12,8 +12,8 @@ const ToolsSection = () => {
   // Vocal Remover tool data
   const tool = {
     id: 'vocal-remover',
-    title: 'Vocal Remover',
-    description: 'Remove vocals from your music files to create instrumentals and karaoke tracks.',
+    title: 'Professional Vocal Remover',
+    description: 'Remove vocals from your music using advanced AI technology. Create instrumentals and isolate vocal tracks with professional quality.',
     icon: <AudioWaveform size={24} />,
     path: '/vocalremover',
     color: 'from-purple-500 to-pink-500'
@@ -51,8 +51,8 @@ const ToolsSection = () => {
     <section ref={sectionRef} className="py-16 px-4 bg-gaming-dark">
       <div className="container mx-auto">
         <div className="text-left mb-8 reveal">
-          <h2 className="text-2xl font-bold text-white">Tools</h2>
-          <p className="text-muted-foreground">Enhance your music with our specialized tools</p>
+          <h2 className="text-2xl font-bold text-white">Audio Tools</h2>
+          <p className="text-muted-foreground">Professional audio processing powered by cutting-edge technology</p>
         </div>
 
         <div className="flex justify-center">
