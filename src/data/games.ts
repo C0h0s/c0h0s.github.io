@@ -68,7 +68,7 @@ export const games: Game[] = [
     id: 'slope',
     title: 'Slope',
     thumbnail: 'https://slopeonline.online/upload/imgs/options/slope-game-logo.png',
-    url: 'https://codesandbox.io/p/sandbox/slope-r27bbc?file=%2Findex.html%3A208%2C21',
+    url: 'https://r27bbc.csb.app/',
     category: 'Action'
   },
   {
@@ -77,5 +77,110 @@ export const games: Game[] = [
     thumbnail: 'https://brandlogos.net/wp-content/uploads/2022/07/minecraft-logo_brandlogos.net_faqdi-512x560.png',
     url: 'https://eaglercraft.com/mc/1.8.8-wasm/',
     category: 'Sandbox'
+  },
+  {
+    id: 'moto-x3m',
+    title: 'Moto X3M',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/MotoX3mTeaser.jpg',
+    url: 'https://games.cdn.famobi.com/html5games/m/moto-x3m/v100/?fg_domain=play.famobi.com&fg_aid=A-O9JYH&fg_uid=442157bb-0a48-4e9b-9fa6-e1503f16e8e3&fg_pid=4e5f1429-8e41-4902-8f28-f0662edb1836&fg_beat=080&original_ref=https%3A%2F%2Fplay.famobi.com%2Fmoto-x3m%2FA-O9JYH',
+    category: 'Racing'
+  },
+  {
+    id: 'moto-x3m-pool-party',
+    title: 'Moto X3M Pool Party',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/180/MotoX3mPoolPartyTeaser.jpg?v=0.2-9116448e',
+    url: 'https://play.famobi.com/moto-x3m-pool-party',
+    category: 'Racing'
+  },
+  {
+    id: 'table-tennis-world-tour',
+    title: 'Table Tennis World Tour',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/180/TableTennis_WorldTour_Teaser.jpg?v=0.2-d30525b0',
+    url: 'https://play.famobi.com/table-tennis-world-tour',
+    category: 'Sports'
+  },
+  {
+    id: '8-ball-billiards-classic',
+    title: '8 Ball Billiards Classic',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/180/8BallBilliardsClassicTeaser.jpg?v=0.2-d30525b0',
+    url: 'https://play.famobi.com/8-ball-billiards-classic',
+    category: 'Sports'
+  },
+  {
+    id: 'solitaire-klondike',
+    title: 'Solitaire Klondike',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/SolitaireKlondikeTeaser.jpg',
+    url: 'https://play.famobi.com/solitaire-klondike',
+    category: 'Card'
+  },
+  {
+    id: 'defly',
+    title: 'Defly',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/DeflyTeaser.jpg',
+    url: 'https://play.famobi.com/defly',
+    category: 'Action'
+  },
+  {
+    id: 'peet-a-lock',
+    title: 'Peet A Lock',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/PeetALockTeaser.jpg',
+    url: 'https://play.famobi.com/peet-a-lock',
+    category: 'Puzzle'
+  },
+  {
+    id: 'slam-dunk-basketball',
+    title: 'Slam Dunk Basketball',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/SlamDunkBasketballTeaserB.jpg',
+    url: 'https://play.famobi.com/slam-dunk-basketball',
+    category: 'Sports'
+  },
+  {
+    id: 'gold-mine',
+    title: 'Gold Mine',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/GoldMineTeaser.jpg',
+    url: 'https://play.famobi.com/gold-mine',
+    category: 'Puzzle'
+  },
+  {
+    id: 'fast-circles',
+    title: 'Fast Circles',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/FastCirclesTeaser.jpg',
+    url: 'https://play.famobi.com/fast-circles',
+    category: 'Arcade'
+  },
+  {
+    id: 'minimal-dots',
+    title: 'Minimal Dots',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/MinimalDotsTeaser.jpg',
+    url: 'https://play.famobi.com/minimal-dots',
+    category: 'Puzzle'
+  },
+  {
+    id: 'domino-shades',
+    title: 'Domino Shades',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/DominoShadesTeaser.jpg',
+    url: 'https://play.famobi.com/domino-shades',
+    category: 'Puzzle'
+  },
+  {
+    id: 'pengu-slide',
+    title: 'Pengu Slide',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/PenguSlideTeaser.jpg',
+    url: 'https://play.famobi.com/pengu-slide',
+    category: 'Arcade'
+  },
+  {
+    id: 'cheap-golf',
+    title: 'Cheap Golf',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/CheapGolfTeaser.jpg',
+    url: 'https://play.famobi.com/cheap-golf',
+    category: 'Sports'
+  },
+  {
+    id: 'timber-man',
+    title: 'Timber Man',
+    thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/TimberManTeaser.jpg',
+    url: 'https://play.famobi.com/timber-man',
+    category: 'Action'
   }
 ];
