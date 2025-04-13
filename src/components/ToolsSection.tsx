@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Headphones, ArrowRight, AudioWaveform } from 'lucide-react';
+import { ArrowRight, AudioWaveform } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,8 +12,8 @@ const ToolsSection = () => {
   // Vocal Remover tool data
   const tool = {
     id: 'vocal-remover',
-    title: 'Professional Vocal Remover',
-    description: 'Remove vocals from your music using advanced AI technology. Works with audio files up to 15MB with optimized processing for reliable separation.',
+    title: 'Advanced AI Vocal Remover',
+    description: 'Separate vocals from instrumentals using advanced audio processing techniques. Works with files up to 10MB with high-quality separation.',
     icon: <AudioWaveform size={24} />,
     path: '/vocalremover',
     color: 'from-purple-500 to-pink-500'
@@ -52,7 +52,7 @@ const ToolsSection = () => {
       <div className="container mx-auto">
         <div className="text-left mb-8 reveal">
           <h2 className="text-2xl font-bold text-white">Audio Tools</h2>
-          <p className="text-muted-foreground">Professional audio processing powered by cutting-edge technology</p>
+          <p className="text-muted-foreground">Professional audio processing powered by cutting-edge AI technology</p>
         </div>
 
         <div className="flex justify-center">

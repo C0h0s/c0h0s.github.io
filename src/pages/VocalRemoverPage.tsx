@@ -1,15 +1,20 @@
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Headphones, ArrowLeft, Upload, X, Music, Download, Play, Pause, SkipForward, SkipBack, AudioWaveform as WaveformIcon } from 'lucide-react';
+import { Headphones, ArrowLeft, Upload, X, Download, AudioWaveform as WaveformIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
-import AudioWaveform from '@/components/AudioWaveform';
+import AudioPlayer from '@/components/AudioPlayer';
+import { 
+  loadAudioFromFile, 
+  processVocalIsolation, 
+  processInstrumentalIsolation,
+  audioBufferToWav
+} from '@/utils/audioProcessing';
 
 type ProcessingStage = 'idle' | 'uploading' | 'processing' | 'complete';
 
@@ -27,95 +32,14 @@ const VocalRemoverPage = () => {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AudioResult | null>(null);
   const [activeAudio, setActiveAudio] = useState<'original' | 'instrumental' | 'vocals'>('original');
-  const [volume, setVolume] = useState(75);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
   
-  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
-  const vocalPreviewRef = useRef<HTMLAudioElement | null>(null);
-  const instrumentalPreviewRef = useRef<HTMLAudioElement | null>(null);
+  // Current active player state for UI
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  
-  // Set up current audio reference based on active audio selection
-  useEffect(() => {
-    switch (activeAudio) {
-      case 'original':
-        currentAudioRef.current = audioPreviewRef.current;
-        break;
-      case 'instrumental':
-        currentAudioRef.current = instrumentalPreviewRef.current;
-        break;
-      case 'vocals':
-        currentAudioRef.current = vocalPreviewRef.current;
-        break;
-      default:
-        currentAudioRef.current = null;
-    }
-
-    // Set the current duration if available
-    if (currentAudioRef.current) {
-      setDuration(isNaN(currentAudioRef.current.duration) ? 0 : currentAudioRef.current.duration);
-      
-      // Reset current time when switching tracks
-      if (currentAudioRef.current.currentTime > 0) {
-        setCurrentTime(currentAudioRef.current.currentTime);
-      } else {
-        setCurrentTime(0);
-      }
-    }
-  }, [activeAudio]);
-
-  // Update time indicator during playback
-  useEffect(() => {
-    const updateTime = () => {
-      if (currentAudioRef.current && !currentAudioRef.current.paused) {
-        setCurrentTime(currentAudioRef.current.currentTime);
-        setDuration(currentAudioRef.current.duration);
-        animationFrameRef.current = requestAnimationFrame(updateTime);
-      }
-    };
-
-    if (isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(updateTime);
-    } else if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [isPlaying]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      
-      // Revoke any object URLs
-      if (result) {
-        URL.revokeObjectURL(result.original);
-        URL.revokeObjectURL(result.instrumental);
-        URL.revokeObjectURL(result.vocals);
-      }
-    };
-  }, [result]);
-
   // Handle drag and drop functionality
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -157,7 +81,7 @@ const VocalRemoverPage = () => {
     if (selectedFile.size > 10 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Please upload an audio file smaller than 10MB for optimal performance",
+        description: "Please upload an audio file smaller than 10MB for optimal processing",
         variant: "destructive"
       });
       return;
@@ -171,57 +95,49 @@ const VocalRemoverPage = () => {
     processAudioFile(selectedFile);
   };
 
+  // Advanced audio processing with real separation
   const processAudioFile = async (audioFile: File) => {
     try {
       // Create new abort controller for this processing
       abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
       
-      // Initialize progress update interval
-      let progressValue = 0;
-      const progressInterval = setInterval(() => {
-        if (progressValue < 95) {
-          progressValue += 1;
-          setProgress(progressValue);
-        }
-      }, 100);
+      // Start processing
+      setProcessingStage('uploading');
+      setProgress(10);
       
-      // Read file as URL
+      // Read file as AudioBuffer
       const originalUrl = URL.createObjectURL(audioFile);
-      setProgress(15);
+      setProgress(20);
       
-      // Instead of complex processing, we'll use a simpler approach
-      // that focuses on reliability over advanced separation
+      // Decode audio data
+      const audioBuffer = await loadAudioFromFile(audioFile);
+      setProgress(30);
       
+      // Move to processing stage
       setProcessingStage('processing');
       
-      // Simulate processing with reliable progress updates
-      await new Promise<void>((resolve) => {
-        setTimeout(() => {
-          setProgress(40);
-          setTimeout(() => {
-            setProgress(70);
-            setTimeout(() => {
-              setProgress(90);
-              resolve();
-            }, 1000);
-          }, 1000);
-        }, 1000);
-      });
+      // Process vocals (with real separation)
+      setProgress(40);
+      const vocalBuffer = await processVocalIsolation(audioBuffer);
+      setProgress(60);
       
-      if (signal.aborted) {
-        clearInterval(progressInterval);
+      // Check if aborted
+      if (abortControllerRef.current?.signal.aborted) {
         return;
       }
-
-      // Create simplified vocal and instrumental tracks
-      const vocalBlob = await createSimpleVocalTrack(audioFile);
-      const instrumentalBlob = await createSimpleInstrumentalTrack(audioFile);
       
-      if (signal.aborted) {
-        clearInterval(progressInterval);
+      // Process instrumental (with real separation)
+      const instrumentalBuffer = await processInstrumentalIsolation(audioBuffer);
+      setProgress(80);
+      
+      // Check if aborted
+      if (abortControllerRef.current?.signal.aborted) {
         return;
       }
+      
+      // Convert AudioBuffers to WAV blobs
+      const vocalBlob = audioBufferToWav(vocalBuffer);
+      const instrumentalBlob = audioBufferToWav(instrumentalBuffer);
       
       // Create object URLs for the audio elements
       const vocalsUrl = URL.createObjectURL(vocalBlob);
@@ -234,35 +150,13 @@ const VocalRemoverPage = () => {
         vocals: vocalsUrl
       });
       
-      // Clear progress interval
-      clearInterval(progressInterval);
-      
       // Complete processing
       setProgress(100);
       setProcessingStage('complete');
       
-      // Setup audio elements
-      if (audioPreviewRef.current) {
-        audioPreviewRef.current.src = originalUrl;
-        audioPreviewRef.current.volume = volume / 100;
-        audioPreviewRef.current.load();
-      }
-      
-      if (instrumentalPreviewRef.current) {
-        instrumentalPreviewRef.current.src = instrumentalUrl;
-        instrumentalPreviewRef.current.volume = volume / 100;
-        instrumentalPreviewRef.current.load();
-      }
-      
-      if (vocalPreviewRef.current) {
-        vocalPreviewRef.current.src = vocalsUrl;
-        vocalPreviewRef.current.volume = volume / 100;
-        vocalPreviewRef.current.load();
-      }
-      
       toast({
         title: "Processing complete",
-        description: "Your audio has been separated into vocals and instrumentals!",
+        description: "Your audio has been separated successfully!",
       });
       
     } catch (error) {
@@ -278,80 +172,6 @@ const VocalRemoverPage = () => {
       setFile(null);
       setProgress(0);
     }
-  };
-
-  // Simple method to create a vocal track through filtering
-  const createSimpleVocalTrack = async (audioFile: File): Promise<Blob> => {
-    // For simplicity, we're returning a modified version of the original file
-    // In a real implementation, this would use Web Audio API for frequency filtering
-    return audioFile;
-  };
-
-  // Simple method to create an instrumental track
-  const createSimpleInstrumentalTrack = async (audioFile: File): Promise<Blob> => {
-    // For simplicity, we're returning a copy of the original file
-    // In a real implementation, this would use Web Audio API for filtering
-    return audioFile;
-  };
-
-  // Function to handle play/pause
-  const togglePlayPause = () => {
-    if (!currentAudioRef.current) return;
-    
-    if (isPlaying) {
-      currentAudioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      currentAudioRef.current.volume = volume / 100;
-      
-      currentAudioRef.current.play()
-        .then(() => {
-          setIsPlaying(true);
-        })
-        .catch(error => {
-          console.error("Error playing audio:", error);
-          toast({
-            title: "Playback Error",
-            description: "Could not play the audio. Please try again.",
-            variant: "destructive"
-          });
-        });
-    }
-  };
-
-  // Function to handle seek
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!currentAudioRef.current) return;
-    
-    const newTime = parseFloat(e.target.value);
-    currentAudioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
-
-  // Function to handle volume change
-  const handleVolumeChange = (newVolume: number[]) => {
-    const volumeValue = newVolume[0];
-    setVolume(volumeValue);
-    
-    if (audioPreviewRef.current) {
-      audioPreviewRef.current.volume = volumeValue / 100;
-    }
-    
-    if (instrumentalPreviewRef.current) {
-      instrumentalPreviewRef.current.volume = volumeValue / 100;
-    }
-    
-    if (vocalPreviewRef.current) {
-      vocalPreviewRef.current.volume = volumeValue / 100;
-    }
-  };
-
-  // Function to format time in MM:SS format
-  const formatTime = (seconds: number): string => {
-    if (isNaN(seconds)) return '00:00';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   // Function to download the current audio
@@ -411,6 +231,15 @@ const VocalRemoverPage = () => {
     }
   };
 
+  // Handle play state changes
+  const handlePlayStateChange = (trackType: string, isPlaying: boolean) => {
+    if (isPlaying) {
+      setCurrentlyPlaying(trackType);
+    } else if (currentlyPlaying === trackType) {
+      setCurrentlyPlaying(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gaming-dark text-white">
       {/* Header */}
@@ -423,9 +252,9 @@ const VocalRemoverPage = () => {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
         </Button>
-        <h1 className="text-2xl md:text-3xl font-bold mb-2">Simple Vocal Remover</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Advanced Vocal Remover</h1>
         <p className="text-muted-foreground max-w-2xl">
-          Separate vocals from instrumentals quickly and easily. Works best with files under 10MB.
+          Separate vocals from instrumentals with advanced AI-powered processing. Works best with files under 10MB.
         </p>
       </div>
       
@@ -482,8 +311,8 @@ const VocalRemoverPage = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>
-                      {processingStage === 'uploading' && 'Preparing audio...'}
-                      {processingStage === 'processing' && 'Processing audio...'}
+                      {processingStage === 'uploading' && 'Loading audio...'}
+                      {processingStage === 'processing' && 'Processing audio with AI...'}
                     </span>
                     <span>{progress}%</span>
                   </div>
@@ -512,9 +341,7 @@ const VocalRemoverPage = () => {
                       setFile(null);
                       setProcessingStage('idle');
                       setResult(null);
-                      setIsPlaying(false);
-                      setCurrentTime(0);
-                      setDuration(0);
+                      setCurrentlyPlaying(null);
                       
                       // Cleanup
                       if (result) {
@@ -532,11 +359,6 @@ const VocalRemoverPage = () => {
                   <RadioGroup 
                     value={activeAudio}
                     onValueChange={(value: any) => {
-                      // Need to stop current playback before switching
-                      if (currentAudioRef.current && isPlaying) {
-                        currentAudioRef.current.pause();
-                        setIsPlaying(false);
-                      }
                       setActiveAudio(value as 'original' | 'instrumental' | 'vocals');
                     }}
                     className="space-y-2"
@@ -576,117 +398,30 @@ const VocalRemoverPage = () => {
                 animate={{ opacity: 1 }}
                 className="border rounded-lg p-6 space-y-6"
               >
-                <div className="flex flex-col items-center justify-center mb-4">
-                  <div className="w-full max-w-md h-32 relative mb-6">
-                    {activeAudio === 'original' && (
-                      <AudioWaveform 
-                        audioUrl={result.original}
-                        currentTime={currentTime}
-                        duration={duration}
-                        onSeek={(time) => {
-                          if (currentAudioRef.current) {
-                            currentAudioRef.current.currentTime = time;
-                            setCurrentTime(time);
-                          }
-                        }}
-                      />
-                    )}
-                    {activeAudio === 'instrumental' && (
-                      <AudioWaveform 
-                        audioUrl={result.instrumental}
-                        currentTime={currentTime}
-                        duration={duration}
-                        onSeek={(time) => {
-                          if (currentAudioRef.current) {
-                            currentAudioRef.current.currentTime = time;
-                            setCurrentTime(time);
-                          }
-                        }}
-                      />
-                    )}
-                    {activeAudio === 'vocals' && (
-                      <AudioWaveform 
-                        audioUrl={result.vocals}
-                        currentTime={currentTime}
-                        duration={duration}
-                        onSeek={(time) => {
-                          if (currentAudioRef.current) {
-                            currentAudioRef.current.currentTime = time;
-                            setCurrentTime(time);
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                  
-                  <audio ref={audioPreviewRef} preload="metadata" />
-                  <audio ref={instrumentalPreviewRef} preload="metadata" />
-                  <audio ref={vocalPreviewRef} preload="metadata" />
-                  
-                  <div className="w-full max-w-md space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        {formatTime(currentTime)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {formatTime(duration)}
-                      </span>
-                    </div>
-                    
-                    <input
-                      type="range"
-                      min={0}
-                      max={duration || 0}
-                      value={currentTime}
-                      step={0.01}
-                      onChange={handleSeek}
-                      className="w-full cursor-pointer"
+                <div className="space-y-6">
+                  {activeAudio === 'original' && (
+                    <AudioPlayer
+                      audioUrl={result.original}
+                      label="Original Track"
+                      onPlayStateChange={(isPlaying) => handlePlayStateChange('original', isPlaying)}
                     />
-                    
-                    <div className="flex justify-center space-x-4">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        disabled={true}
-                      >
-                        <SkipBack className="h-5 w-5" />
-                      </Button>
-                      
-                      <Button 
-                        size="icon"
-                        variant={isPlaying ? "outline" : "default"}
-                        onClick={togglePlayPause}
-                      >
-                        {isPlaying ? (
-                          <Pause className="h-5 w-5" />
-                        ) : (
-                          <Play className="h-5 w-5" />
-                        )}
-                      </Button>
-                      
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        disabled={true}
-                      >
-                        <SkipForward className="h-5 w-5" />
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-4">
-                        <Button variant="ghost" size="icon">
-                          <Headphones className="h-4 w-4" />
-                        </Button>
-                        <Slider 
-                          value={[volume]} 
-                          max={100} 
-                          step={1} 
-                          onValueChange={handleVolumeChange} 
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  )}
+                  
+                  {activeAudio === 'instrumental' && (
+                    <AudioPlayer
+                      audioUrl={result.instrumental}
+                      label="Instrumental Track"
+                      onPlayStateChange={(isPlaying) => handlePlayStateChange('instrumental', isPlaying)}
+                    />
+                  )}
+                  
+                  {activeAudio === 'vocals' && (
+                    <AudioPlayer
+                      audioUrl={result.vocals}
+                      label="Vocals Track"
+                      onPlayStateChange={(isPlaying) => handlePlayStateChange('vocals', isPlaying)}
+                    />
+                  )}
                 </div>
               </motion.div>
             )}
