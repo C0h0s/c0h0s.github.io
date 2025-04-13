@@ -23,7 +23,7 @@ const CustomCursor = () => {
   return (
     <div 
       ref={cursorRef} 
-      className="fixed w-6 h-6 rounded-full border border-white/50 bg-white/10 pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2"
+      className="fixed w-4 h-4 rounded-full bg-white/20 pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2"
       style={{ transition: 'transform 0.1s ease-out' }}
     />
   );
