@@ -9,7 +9,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import Index from "./pages/Index";
 import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
-import GamePlayer from "./pages/GamePlayer";
 import LoadingScreen from "./components/LoadingScreen";
 
 const queryClient = new QueryClient();
@@ -42,7 +41,6 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/game/:gameId" element={<GameDetail />} />
-              <Route path="/play/:gameId" element={<GamePlayer />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

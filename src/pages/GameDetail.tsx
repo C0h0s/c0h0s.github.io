@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
@@ -14,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { games } from '@/data/games';
 
 // Sample game data - in a real app this would come from an API
 const GAME_DATA = {
@@ -52,21 +52,35 @@ const GameDetail = () => {
   const [game, setGame] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [liked, setLiked] = useState(false);
+  const [gameUrl, setGameUrl] = useState("");
 
   useEffect(() => {
-    // Simulate API fetch
+    // Simulate API fetch for game details
     const fetchData = () => {
       setIsLoading(true);
       setTimeout(() => {
         if (gameId && GAME_DATA[gameId as keyof typeof GAME_DATA]) {
           setGame(GAME_DATA[gameId as keyof typeof GAME_DATA]);
         }
+        
+        // Find actual game URL from the games data
+        const actualGame = games.find(g => g.id === gameId);
+        if (actualGame) {
+          setGameUrl(actualGame.url);
+        }
+        
         setIsLoading(false);
       }, 500);
     };
 
     fetchData();
   }, [gameId]);
+
+  const handlePlayGame = () => {
+    if (gameUrl) {
+      window.open(gameUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -114,32 +128,32 @@ const GameDetail = () => {
               
               <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
                 <div className="w-32 h-32 rounded-xl overflow-hidden flex-shrink-0 border-2 border-gaming-purple/50 animate-pulse-glow">
-                  <img src={game.thumbnail} alt={game.title} className="w-full h-full object-cover" />
+                  <img src={game?.thumbnail} alt={game?.title} className="w-full h-full object-cover" />
                 </div>
                 
                 <div className="flex-grow text-left">
                   <div className="flex items-center space-x-3 mb-2">
                     <span className="bg-gaming-purple/90 text-xs px-2 py-1 rounded-full text-white">
-                      {game.category}
+                      {game?.category}
                     </span>
                     <div className="flex items-center text-xs text-muted-foreground">
-                      <Users className="h-3 w-3 mr-1" /> {game.players}
+                      <Users className="h-3 w-3 mr-1" /> {game?.players}
                     </div>
                   </div>
                   
-                  <h1 className="text-3xl md:text-4xl font-bold">{game.title}</h1>
+                  <h1 className="text-3xl md:text-4xl font-bold">{game?.title}</h1>
                   
                   <div className="flex items-center mt-2">
                     <div className="flex space-x-1 mr-3">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <svg key={star} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" 
-                            fill={star <= Math.round(game.rating) ? "#9b87f5" : "#2A2D3A"} 
+                            fill={star <= Math.round(game?.rating || 0) ? "#9b87f5" : "#2A2D3A"} 
                             stroke="none">
                           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                         </svg>
                       ))}
                     </div>
-                    <span className="text-sm">{game.rating} ({game.reviews} reviews)</span>
+                    <span className="text-sm">{game?.rating} ({game?.reviews} reviews)</span>
                   </div>
                 </div>
                 
@@ -163,7 +177,10 @@ const GameDetail = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto">
             <div className="mb-8">
-              <Button className="bg-gaming-purple hover:bg-gaming-purple/90 text-white w-full sm:w-auto">
+              <Button 
+                className="bg-gaming-purple hover:bg-gaming-purple/90 text-white w-full sm:w-auto"
+                onClick={handlePlayGame}
+              >
                 <Play className="mr-2 h-5 w-5" /> Play Now
               </Button>
             </div>
@@ -173,14 +190,14 @@ const GameDetail = () => {
                 <div className="bg-secondary/30 rounded-xl p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">About the Game</h2>
                   <p className="text-muted-foreground">
-                    {game.description}
+                    {game?.description}
                   </p>
                 </div>
                 
                 <div className="bg-secondary/30 rounded-xl p-6">
                   <h2 className="text-xl font-semibold mb-4">How to Play</h2>
                   <p className="text-muted-foreground mb-6">
-                    {game.instructions}
+                    {game?.instructions}
                   </p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -213,15 +230,15 @@ const GameDetail = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Developer</span>
-                      <span>{game.developer}</span>
+                      <span>{game?.developer}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Release Date</span>
-                      <span>{game.releaseDate}</span>
+                      <span>{game?.releaseDate}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Category</span>
-                      <span>{game.category}</span>
+                      <span>{game?.category}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Platform</span>
@@ -233,7 +250,7 @@ const GameDetail = () => {
                 <div className="bg-secondary/30 rounded-xl p-6 text-left">
                   <h3 className="text-lg font-semibold mb-4">Similar Games</h3>
                   <div className="space-y-3">
-                    {game.similarGames.map((gameId: string) => {
+                    {game?.similarGames.map((gameId: string) => {
                       const similarGame = GAME_DATA[gameId as keyof typeof GAME_DATA];
                       if (!similarGame) return null;
                       
