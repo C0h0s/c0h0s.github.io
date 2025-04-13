@@ -823,4 +823,421 @@ const VocalRemoverPage = () => {
               
               // Set the sample in the DataView
               view.setInt16(offset + index, intSample, true);
-              index += 2
+              index += 2;
+            }
+          }
+        }
+        
+        // Create WAV blob with proper MIME type
+        resolve(new Blob([buffer], { type: 'audio/wav' }));
+      } catch (error) {
+        console.error('Error converting to WAV:', error);
+        reject(error);
+      }
+    });
+  };
+
+  // Helper function to write strings to DataView
+  const writeString = (view: DataView, offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+
+  // Function to handle play/pause
+  const togglePlayPause = () => {
+    if (!currentAudioRef.current) return;
+    
+    if (isPlaying) {
+      currentAudioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      // Ensure we have the proper volume before playing
+      if (currentAudioRef.current === vocalPreviewRef.current) {
+        currentAudioRef.current.volume = Math.min((volume / 100) * 10.0, 1.0); 
+      } else if (currentAudioRef.current === instrumentalPreviewRef.current) {
+        currentAudioRef.current.volume = Math.min((volume / 100) * 1.2, 1.0);
+      } else {
+        currentAudioRef.current.volume = Math.min(volume / 100, 1.0);
+      }
+      
+      currentAudioRef.current.play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch(error => {
+          console.error("Error playing audio:", error);
+          toast({
+            title: "Playback Error",
+            description: "Could not play the audio. Please try again.",
+            variant: "destructive"
+          });
+        });
+    }
+  };
+
+  // Function to handle seek
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!currentAudioRef.current) return;
+    
+    const newTime = parseFloat(e.target.value);
+    currentAudioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  // Function to handle volume change
+  const handleVolumeChange = (newVolume: number[]) => {
+    const volumeValue = newVolume[0];
+    setVolume(volumeValue);
+    
+    // Apply different volume levels based on track type
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.volume = Math.min(volumeValue / 100, 1.0);
+    }
+    
+    if (instrumentalPreviewRef.current) {
+      instrumentalPreviewRef.current.volume = Math.min((volumeValue / 100) * 1.2, 1.0);
+    }
+    
+    if (vocalPreviewRef.current) {
+      vocalPreviewRef.current.volume = Math.min((volumeValue / 100) * 10.0, 1.0);
+    }
+  };
+
+  // Function to format time in MM:SS format
+  const formatTime = (seconds: number): string => {
+    if (isNaN(seconds)) return '00:00';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Function to download the current audio
+  const downloadCurrentAudio = () => {
+    if (!result) return;
+    
+    let url: string;
+    let filename: string;
+    
+    switch (activeAudio) {
+      case 'instrumental':
+        url = result.instrumental;
+        filename = file ? `${file.name.split('.')[0]}_instrumental.wav` : 'instrumental.wav';
+        break;
+      case 'vocals':
+        url = result.vocals;
+        filename = file ? `${file.name.split('.')[0]}_vocals.wav` : 'vocals.wav';
+        break;
+      default:
+        url = result.original;
+        filename = file ? file.name : 'original.wav';
+    }
+    
+    // Create temporary link and trigger download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Function to cancel processing
+  const cancelProcessing = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    // Reset state
+    setProcessingStage('idle');
+    setFile(null);
+    setProgress(0);
+    setProcessingError(null);
+  };
+
+  // Function to handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileSelected(e.target.files[0]);
+    }
+  };
+
+  // Function to trigger file input click
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gaming-dark text-white">
+      {/* Header */}
+      <div className="container mx-auto px-4 pt-6 pb-4">
+        <Button 
+          variant="ghost" 
+          className="mb-4 flex items-center text-white hover:bg-white/10"
+          onClick={() => navigate('/')}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Home
+        </Button>
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Professional Vocal Remover</h1>
+        <p className="text-muted-foreground max-w-2xl">
+          Separate vocals from instrumentals using advanced audio processing. Optimized for files up to 15MB.
+        </p>
+      </div>
+      
+      {/* Main content */}
+      <div className="container mx-auto px-4 pb-20">
+        <div className="grid md:grid-cols-5 gap-6">
+          {/* Upload section (2 cols on medium+ screens) */}
+          <div className="md:col-span-2 space-y-6">
+            {processingStage === 'idle' && (
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 h-64 flex flex-col items-center justify-center transition-colors ${
+                  isDragging ? 'border-primary bg-primary/10' : 'border-gray-700 hover:border-gray-600'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={triggerFileInput}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
+                <Upload className="h-10 w-10 mb-4 text-muted-foreground" />
+                <p className="text-center text-sm text-muted-foreground">
+                  <span className="font-medium text-white">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  MP3, WAV, FLAC or OGG (max. 15MB)
+                </p>
+              </div>
+            )}
+            
+            {processingStage !== 'idle' && processingStage !== 'complete' && (
+              <div className="border rounded-lg p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">{file?.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {file && `${(file.size / (1024 * 1024)).toFixed(2)} MB`}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={cancelProcessing}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>
+                      {processingStage === 'uploading' && 'Preparing...'}
+                      {processingStage === 'analyzing' && 'Analyzing audio...'}
+                      {processingStage === 'separating' && 'Separating vocals...'}
+                      {processingStage === 'finalizing' && 'Finalizing output...'}
+                    </span>
+                    <span>{progress}%</span>
+                  </div>
+                  <Progress value={progress} />
+                </div>
+                
+                {processingError && (
+                  <div className="text-sm text-red-500 mt-2">
+                    Error: {processingError}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {processingStage === 'complete' && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="border rounded-lg p-6 space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium">{file?.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Processing complete!
+                    </p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => {
+                      setFile(null);
+                      setProcessingStage('idle');
+                      setResult(null);
+                      setIsPlaying(false);
+                      setCurrentTime(0);
+                      setDuration(0);
+                      
+                      // Cleanup
+                      if (result) {
+                        URL.revokeObjectURL(result.original);
+                        URL.revokeObjectURL(result.instrumental);
+                        URL.revokeObjectURL(result.vocals);
+                      }
+                    }}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                
+                <div className="pt-2">
+                  <RadioGroup 
+                    value={activeAudio}
+                    onValueChange={(value: any) => {
+                      // Need to stop current playback before switching
+                      if (currentAudioRef.current && isPlaying) {
+                        currentAudioRef.current.pause();
+                        setIsPlaying(false);
+                      }
+                      setActiveAudio(value as 'original' | 'instrumental' | 'vocals');
+                    }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="original" id="original" />
+                      <Label htmlFor="original" className="cursor-pointer">Original Track</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="instrumental" id="instrumental" />
+                      <Label htmlFor="instrumental" className="cursor-pointer">Instrumental Only</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="vocals" id="vocals" />
+                      <Label htmlFor="vocals" className="cursor-pointer">Vocals Only</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <Button 
+                  variant="secondary"
+                  className="w-full"
+                  onClick={downloadCurrentAudio}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download {activeAudio.charAt(0).toUpperCase() + activeAudio.slice(1)}
+                </Button>
+              </motion.div>
+            )}
+          </div>
+          
+          {/* Player section (3 cols on medium+ screens) */}
+          <div className="md:col-span-3">
+            {processingStage === 'complete' && result && (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }}
+                className="border rounded-lg p-6 space-y-6"
+              >
+                <div className="flex flex-col items-center justify-center mb-4">
+                  <div className="w-full max-w-md h-32 relative mb-6">
+                    {activeAudio === 'original' && <AudioWaveform audioUrl={result.original} />}
+                    {activeAudio === 'instrumental' && <AudioWaveform audioUrl={result.instrumental} />}
+                    {activeAudio === 'vocals' && <AudioWaveform audioUrl={result.vocals} />}
+                  </div>
+                  
+                  <audio ref={audioPreviewRef} preload="metadata" />
+                  <audio ref={instrumentalPreviewRef} preload="metadata" />
+                  <audio ref={vocalPreviewRef} preload="metadata" />
+                  
+                  <div className="w-full max-w-md space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {formatTime(currentTime)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatTime(duration)}
+                      </span>
+                    </div>
+                    
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration || 0}
+                      value={currentTime}
+                      step={0.01}
+                      onChange={handleSeek}
+                      className="w-full cursor-pointer"
+                    />
+                    
+                    <div className="flex justify-center space-x-4">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        disabled={true}  // Skip back not implemented yet
+                      >
+                        <SkipBack className="h-5 w-5" />
+                      </Button>
+                      
+                      <Button 
+                        size="icon"
+                        variant={isPlaying ? "outline" : "default"}
+                        onClick={togglePlayPause}
+                      >
+                        {isPlaying ? (
+                          <Pause className="h-5 w-5" />
+                        ) : (
+                          <Play className="h-5 w-5" />
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        disabled={true}  // Skip forward not implemented yet
+                      >
+                        <SkipForward className="h-5 w-5" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-4">
+                        <Button variant="ghost" size="icon">
+                          <Headphones className="h-4 w-4" />
+                        </Button>
+                        <Slider 
+                          value={[volume]} 
+                          max={100} 
+                          step={1} 
+                          onValueChange={handleVolumeChange} 
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Note: Vocals may require higher volume levels
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            
+            {processingStage === 'idle' && (
+              <div className="border rounded-lg p-6 h-full flex flex-col items-center justify-center text-muted-foreground">
+                <WaveformIcon className="h-16 w-16 mb-4 opacity-50" />
+                <p className="text-center">
+                  Upload an audio file to begin processing
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default VocalRemoverPage;
