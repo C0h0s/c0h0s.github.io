@@ -34,12 +34,16 @@ const GameCard = ({ id, title, thumbnail, category, delay }: GameCardProps) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: delay / 1000 }}
       onClick={openGameInNewTab}
+      whileHover={{ 
+        scale: 1.05,
+        transition: { duration: 0.3 }
+      }}
     >
       <div className="aspect-[4/3] rounded-lg overflow-hidden relative">
         <img 
           src={thumbnail} 
           alt={title} 
-          className="w-full h-full object-cover transition-transform duration-500"
+          className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
         />
         <div className="game-card-gradient"></div>
         <div className="absolute bottom-0 left-0 p-3 w-full">
