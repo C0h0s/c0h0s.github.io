@@ -78,7 +78,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg bg-background/80 py-3 px-4 border-b border-border/40">
+    <nav className="fixed top-0 left-0 right-0 z-[100] backdrop-blur-lg bg-background/80 py-3 px-4 border-b border-border/40">
       <div className="container mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2">
           <img 
@@ -93,10 +93,8 @@ const Navbar = () => {
           <div className="relative">
             <div 
               className={`flex items-center bg-secondary rounded-full overflow-hidden transition-all duration-300 ${searchOpen ? 'w-64' : 'w-10'}`}
-              onClick={() => !searchOpen && setSearchOpen(true)}
-              style={{ cursor: 'pointer' }}
             >
-              <button className="p-2 text-white" style={{ cursor: 'pointer' }}>
+              <button className="p-2 text-white">
                 <Search size={20} />
               </button>
               {searchOpen && (
@@ -108,7 +106,6 @@ const Navbar = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
-                    style={{ cursor: 'text' }}
                   />
                 </>
               )}
@@ -116,7 +113,7 @@ const Navbar = () => {
             
             {/* Search Results Dropdown */}
             {searchOpen && searchQuery && (
-              <div className="absolute top-12 right-0 w-64 bg-background border border-border rounded-md shadow-lg z-50">
+              <div className="absolute top-12 right-0 w-64 bg-background border border-border rounded-md shadow-lg z-[101]">
                 <Command>
                   <CommandList>
                     {searchResults.length > 0 ? (
@@ -125,8 +122,6 @@ const Navbar = () => {
                           <CommandItem 
                             key={game.id} 
                             onSelect={() => handleSelectGame(game.id)}
-                            className="cursor-pointer"
-                            style={{ cursor: 'pointer' }}
                           >
                             <div className="flex items-center space-x-2">
                               <img 

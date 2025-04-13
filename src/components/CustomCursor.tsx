@@ -42,8 +42,8 @@ const CustomCursor = () => {
     document.addEventListener('mousedown', onMouseDown);
     document.addEventListener('mouseup', onMouseUp);
     
-    // Apply to all clickable elements
-    const clickableElements = document.querySelectorAll('a, button, [role="button"], input, .cursor-pointer');
+    // Apply to all clickable elements including navbar elements
+    const clickableElements = document.querySelectorAll('a, button, [role="button"], input, .cursor-pointer, nav *, .search-bar, .nav-item');
     clickableElements.forEach(element => {
       element.addEventListener('mouseenter', onMouseEnterClickable);
       element.addEventListener('mouseleave', onMouseLeaveClickable);
@@ -65,11 +65,11 @@ const CustomCursor = () => {
     <>
       <div 
         ref={cursorOuterRef} 
-        className="fixed w-8 h-8 rounded-full bg-white/10 pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 border border-white/20"
+        className="fixed w-8 h-8 rounded-full bg-white/10 pointer-events-none z-[9999] transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 border border-white/20"
       />
       <div 
         ref={cursorRef} 
-        className="fixed w-4 h-4 rounded-full bg-white/30 pointer-events-none z-50 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
+        className="fixed w-4 h-4 rounded-full bg-white/30 pointer-events-none z-[9999] transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
       />
     </>
   );
