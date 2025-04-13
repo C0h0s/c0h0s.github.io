@@ -1,11 +1,9 @@
-
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import GameCard from '@/components/GameCard';
 import { games } from '@/data/games';
 import { motion } from 'framer-motion';
 import BackgroundParticles from '@/components/BackgroundParticles';
-import CustomCursor from '@/components/CustomCursor';
 import MostPlayedGames from '@/components/MostPlayedGames';
 
 const Index = () => {
@@ -31,7 +29,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <CustomCursor />
       <BackgroundParticles />
       <Navbar />
       
