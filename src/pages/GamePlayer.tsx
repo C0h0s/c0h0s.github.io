@@ -5,6 +5,7 @@ import { games } from '@/data/games';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { toast } from 'sonner';
 
 const GamePlayer = () => {
   const { gameId } = useParams();
@@ -15,11 +16,31 @@ const GamePlayer = () => {
   useEffect(() => {
     if (!game) {
       navigate('/');
+      return;
     }
     
     // Reset loading state when game changes
     setIsLoading(true);
+    
+    // Show toast that game is loading
+    toast.info(`Loading ${game.title}...`, {
+      duration: 2000
+    });
   }, [game, navigate]);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+    toast.success(`${game?.title} loaded successfully!`, {
+      duration: 2000
+    });
+  };
+
+  const handleIframeError = () => {
+    setIsLoading(false);
+    toast.error("Failed to load game. Please try again.", {
+      duration: 5000
+    });
+  };
 
   if (!game) return null;
 
@@ -53,9 +74,10 @@ const GamePlayer = () => {
             className="w-full h-full"
             sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             allow="fullscreen; autoplay; encrypted-media"
-            referrerPolicy="no-referrer"
-            loading="lazy"
-            onLoad={() => setIsLoading(false)}
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            loading="eager"
+            referrerPolicy="origin"
           ></iframe>
         </div>
       </main>
