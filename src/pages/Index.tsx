@@ -6,6 +6,7 @@ import { games } from '@/data/games';
 import { motion } from 'framer-motion';
 import BackgroundParticles from '@/components/BackgroundParticles';
 import CustomCursor from '@/components/CustomCursor';
+import MostPlayedGames from '@/components/MostPlayedGames';
 
 const Index = () => {
   // Animation variants
@@ -56,6 +57,8 @@ const Index = () => {
           </motion.div>
         </div>
       </main>
+      
+      <MostPlayedGames />
     </div>
   );
 };
