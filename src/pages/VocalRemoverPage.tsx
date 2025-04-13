@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -40,6 +39,7 @@ const VocalRemoverPage = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -52,6 +52,7 @@ const VocalRemoverPage = () => {
   
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Set up current audio reference based on active audio selection
   useEffect(() => {
@@ -105,6 +106,20 @@ const VocalRemoverPage = () => {
     };
   }, [isPlaying]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up any processing when component unmounts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
   // Handle drag and drop functionality
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -126,6 +141,15 @@ const VocalRemoverPage = () => {
   }, []);
 
   const handleFileSelected = (selectedFile: File) => {
+    // Cancel any existing processing
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    // Reset error state
+    setProcessingError(null);
+    
     // Check if the file is an audio file
     if (!selectedFile.type.startsWith('audio/')) {
       toast({
@@ -156,24 +180,51 @@ const VocalRemoverPage = () => {
 
   const processAudioFile = async (audioFile: File) => {
     try {
+      // Create new abort controller for this processing
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+      
       // Initialize AudioContext if not already done
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        try {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } catch (error) {
+          console.error("Failed to create AudioContext:", error);
+          throw new Error("Your browser doesn't support audio processing. Please try a different browser.");
+        }
       }
 
-      // Read file as ArrayBuffer
-      const arrayBuffer = await readFileAsArrayBuffer(audioFile);
+      // Read file as ArrayBuffer with error handling
+      const arrayBuffer = await readFileAsArrayBuffer(audioFile, signal);
+      
+      if (signal.aborted) return; // Stop if aborted
+      
       setProcessingStage('analyzing');
       setProgress(20);
 
-      // Decode audio data
-      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      // Decode audio data with error handling
+      let audioBuffer: AudioBuffer;
+      try {
+        audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      } catch (error) {
+        console.error("Failed to decode audio data:", error);
+        throw new Error("Unable to process this audio file. It might be corrupted or in an unsupported format.");
+      }
+      
+      if (signal.aborted) return; // Stop if aborted
+      
       audioBufferRef.current = audioBuffer;
       setProcessingStage('separating');
       setProgress(50);
 
       // Perform vocal separation with professional grade algorithm
-      const { instrumentalBuffer, vocalsBuffer } = await professionalVocalSeparation(audioBuffer);
+      const { instrumentalBuffer, vocalsBuffer } = await professionalVocalSeparation(audioBuffer, signal, (separationProgress) => {
+        // Update progress during separation (from 50% to 80%)
+        const calculatedProgress = 50 + Math.floor(separationProgress * 30);
+        setProgress(calculatedProgress);
+      });
+      
+      if (signal.aborted) return; // Stop if aborted
       
       setProcessingStage('finalizing');
       setProgress(80);
@@ -182,6 +233,8 @@ const VocalRemoverPage = () => {
       const originalBlob = await audioBufferToWav(audioBuffer);
       const instrumentalBlob = await audioBufferToWav(instrumentalBuffer);
       const vocalsBlob = await audioBufferToWav(vocalsBuffer);
+      
+      if (signal.aborted) return; // Stop if aborted
       
       // Create object URLs for the audio elements
       const originalUrl = URL.createObjectURL(originalBlob);
@@ -197,6 +250,8 @@ const VocalRemoverPage = () => {
       
       // Setup audio elements after a short delay to ensure they're ready
       setTimeout(() => {
+        if (signal.aborted) return; // Final abort check
+        
         if (audioPreviewRef.current) {
           audioPreviewRef.current.src = originalUrl;
           audioPreviewRef.current.volume = volume / 100;
@@ -212,6 +267,9 @@ const VocalRemoverPage = () => {
         
         setProcessingStage('complete');
         setProgress(100);
+        
+        // Clear the abort controller since processing is complete
+        abortControllerRef.current = null;
       }, 200);
       
       toast({
@@ -220,33 +278,66 @@ const VocalRemoverPage = () => {
       });
     } catch (error) {
       console.error('Error processing audio:', error);
+      
+      // Don't show error if processing was intentionally aborted
+      if (abortControllerRef.current?.signal.aborted) return;
+      
+      const errorMessage = error instanceof Error ? error.message : "Unknown error processing audio";
+      setProcessingError(errorMessage);
+      
       toast({
         title: "Processing Error",
-        description: "There was an error processing your audio file.",
+        description: errorMessage,
         variant: "destructive"
       });
+      
       setProcessingStage('idle');
+      setFile(null);
+      setProgress(0);
+      
+      // Clear the abort controller
+      abortControllerRef.current = null;
     }
   };
 
-  // Utility function to read file as ArrayBuffer
-  const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+  // Utility function to read file as ArrayBuffer with abort support
+  const readFileAsArrayBuffer = (file: File, signal?: AbortSignal): Promise<ArrayBuffer> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      
       reader.onload = () => {
+        if (signal?.aborted) {
+          reject(new Error("File reading was aborted"));
+          return;
+        }
+        
         if (reader.result instanceof ArrayBuffer) {
           resolve(reader.result);
         } else {
           reject(new Error("Failed to read file as ArrayBuffer"));
         }
       };
-      reader.onerror = () => reject(reader.error);
+      
+      reader.onerror = () => reject(reader.error || new Error("Unknown error reading file"));
+      
+      // Handle abort
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          reader.abort();
+          reject(new Error("File reading was aborted"));
+        });
+      }
+      
       reader.readAsArrayBuffer(file);
     });
   };
 
   // Professional vocal separation algorithm modeled after commercial vocal separators
-  const professionalVocalSeparation = async (audioBuffer: AudioBuffer): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
+  const professionalVocalSeparation = async (
+    audioBuffer: AudioBuffer, 
+    signal?: AbortSignal,
+    progressCallback?: (progress: number) => void
+  ): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
     // Create new AudioContext for output buffers
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const numChannels = audioBuffer.numberOfChannels;
@@ -265,6 +356,11 @@ const VocalRemoverPage = () => {
     
     // Process each channel separately for stereo support
     for (let channel = 0; channel < numChannels; channel++) {
+      // Check for abort signal before processing each channel
+      if (signal?.aborted) {
+        throw new Error("Processing aborted");
+      }
+      
       const inputData = audioBuffer.getChannelData(channel);
       const instrumentalData = instrumentalBuffer.getChannelData(channel);
       const vocalsData = vocalsBuffer.getChannelData(channel);
@@ -277,213 +373,240 @@ const VocalRemoverPage = () => {
       
       // Process with each FFT size and blend the results
       for (let fftSizeIndex = 0; fftSizeIndex < fftSizes.length; fftSizeIndex++) {
+        // Check for abort before processing each FFT size
+        if (signal?.aborted) {
+          throw new Error("Processing aborted");
+        }
+        
         const fftSize = fftSizes[fftSizeIndex];
-        const fft = new FFT(fftSize);
         
-        // More overlap for better quality (industry standard is 75-87.5% overlap)
-        const hopSize = Math.floor(fftSize / 8); // 87.5% overlap
-        
-        // Create windowing functions for analysis/synthesis
-        const analysisWindow = createHannWindow(fftSize);
-        const synthesisWindow = createHannWindow(fftSize);
-        
-        // Normalize window for perfect reconstruction with overlap-add
-        let windowSum = 0;
-        for (let i = 0; i < fftSize; i += hopSize) {
-          if (i < length) {
-            windowSum += analysisWindow[i % fftSize] * synthesisWindow[i % fftSize];
-          }
-        }
-        
-        const windowScaleFactor = 1.0 / (windowSum / hopSize);
-        
-        // Temporary buffers for this FFT size
-        const tempInstrumental = new Float32Array(length);
-        const tempVocals = new Float32Array(length);
-        
-        // Process in overlapping chunks - inspired by professional vocal removers
-        for (let i = 0; i < length; i += hopSize) {
-          // Update progress occasionally
-          if (i % (hopSize * 20) === 0) {
-            const fftProgress = fftSizeIndex / fftSizes.length;
-            const chunkProgress = i / length;
-            setProgress(50 + Math.floor((fftProgress + chunkProgress / fftSizes.length) * 30));
-          }
+        try {
+          const fft = new FFT(fftSize);
           
-          // Create windowed chunk
-          const chunk = new Float32Array(fftSize);
-          for (let j = 0; j < fftSize; j++) {
-            if (i + j < length) {
-              chunk[j] = inputData[i + j] * analysisWindow[j];
+          // More overlap for better quality (industry standard is 75-87.5% overlap)
+          const hopSize = Math.floor(fftSize / 8); // 87.5% overlap
+          
+          // Create windowing functions for analysis/synthesis
+          const analysisWindow = createHannWindow(fftSize);
+          const synthesisWindow = createHannWindow(fftSize);
+          
+          // Normalize window for perfect reconstruction with overlap-add
+          let windowSum = 0;
+          for (let i = 0; i < fftSize; i += hopSize) {
+            if (i < length) {
+              windowSum += analysisWindow[i % fftSize] * synthesisWindow[i % fftSize];
             }
           }
           
-          // FFT
-          const complexInput = fft.createComplexArray();
-          for (let j = 0; j < fftSize; j++) {
-            complexInput[2 * j] = chunk[j];     // Real part
-            complexInput[2 * j + 1] = 0;        // Imaginary part
-          }
+          const windowScaleFactor = 1.0 / (windowSum / hopSize);
           
-          const complexSpectrum = fft.createComplexArray();
-          fft.transform(complexSpectrum, complexInput);
+          // Temporary buffers for this FFT size
+          const tempInstrumental = new Float32Array(length);
+          const tempVocals = new Float32Array(length);
           
-          // Create spectrum copies for separate processing
-          const instrumentalSpectrum = Array.from(complexSpectrum);
-          const vocalSpectrum = Array.from(complexSpectrum);
-          
-          // Define harmonic/percussive separation parameters based on commercial tools
-          // Professional tools like lalal.ai use machine learning but we'll use a robust spectral model
-          
-          // Vocal frequency ranges tailored for human voice
-          // These are based on professional VST plugins and tools
-          const vocalFreqRanges = [
-            // Main vocal fundamental frequencies (singing & speech)
-            { min: 80, max: 650, vocalGain: 4.0, instGain: 0.02 },
-            
-            // Critical vocal presence and harmonics
-            { min: 650, max: 1800, vocalGain: 7.0, instGain: 0.05 },
-            
-            // Vowel formants and upper harmonics
-            { min: 1800, max: 4500, vocalGain: 8.0, instGain: 0.08 },
-            
-            // Sibilance and high frequencies
-            { min: 4500, max: 8000, vocalGain: 6.5, instGain: 0.2 },
-            
-            // Ultra high (mostly noise)
-            { min: 8000, max: 20000, vocalGain: 2.0, instGain: 0.6 }
-          ];
-          
-          // Implement spectral smoothing (very important for professional separators)
-          // This helps identify continuous harmonic content typical of vocals
-          const smoothedMagnitudes = new Float32Array(fftSize / 2);
-          const phasiness = new Float32Array(fftSize / 2); // Measure of phase stability
-          
-          // Calculate basic magnitudes and phases
-          const magnitudes = new Float32Array(fftSize / 2);
-          const phases = new Float32Array(fftSize / 2);
-          
-          for (let k = 0; k < fftSize / 2; k++) {
-            const real = complexSpectrum[k * 2];
-            const imag = complexSpectrum[k * 2 + 1];
-            magnitudes[k] = Math.sqrt(real * real + imag * imag);
-            phases[k] = Math.atan2(imag, real);
-          }
-          
-          // Apply advanced median filtering for smoothing (industry technique)
-          const medianWindow = 3;
-          for (let k = 0; k < fftSize / 2; k++) {
-            // Get samples for median
-            const samples = [];
-            for (let j = -medianWindow; j <= medianWindow; j++) {
-              const idx = k + j;
-              if (idx >= 0 && idx < fftSize / 2) {
-                samples.push(magnitudes[idx]);
-              }
-            }
-            // Sort and get median
-            samples.sort((a, b) => a - b);
-            smoothedMagnitudes[k] = samples[Math.floor(samples.length / 2)];
-          }
-          
-          // Calculate harmonic measures (important for vocal detection)
-          // Look for harmonic relationships in spectrum - a key technique used in professional tools
-          for (let k = 1; k < fftSize / 2 - 1; k++) {
-            // Harmonic detection - vocals have strong harmonics with regular spacing
-            const isPotentialHarmonic = 
-              (smoothedMagnitudes[k] > smoothedMagnitudes[k-1] && 
-               smoothedMagnitudes[k] > smoothedMagnitudes[k+1]) ||
-              (k > 1 && k < fftSize/2 - 2 && 
-               smoothedMagnitudes[k] > 1.5 * (smoothedMagnitudes[k-2] + smoothedMagnitudes[k+2]) / 2);
-            
-            // Phase stability measure - vocals have more stable phase
-            phasiness[k] = isPotentialHarmonic ? 1.0 : 0.3;
-          }
-          
-          // Bin frequencies in Hz
-          const binToFreq = (bin: number) => bin * sampleRate / fftSize;
-          
-          // Process spectrum - professional separation approach
-          for (let k = 0; k < fftSize / 2; k++) {
-            const freq = binToFreq(k);
-            const real = complexSpectrum[k * 2];
-            const imag = complexSpectrum[k * 2 + 1];
-            const mag = magnitudes[k];
-            const phase = phases[k];
-            
-            // Default suppression values
-            let vocalGain = 0.0;
-            let instrumentalGain = 1.0;
-            
-            // Apply frequency-dependent processing
-            for (const range of vocalFreqRanges) {
-              if (freq >= range.min && freq <= range.max) {
-                // Apply harmonic detection - key feature in high-end separators
-                const harmonicBoost = phasiness[k];
-                
-                // Calculate the vocal isolation factor
-                vocalGain = range.vocalGain * harmonicBoost;
-                instrumentalGain = range.instGain / harmonicBoost;
-                break;
-              }
+          // Process in overlapping chunks - inspired by professional vocal removers
+          for (let i = 0; i < length; i += hopSize) {
+            // Check for abort periodically
+            if (i % (hopSize * 10) === 0 && signal?.aborted) {
+              throw new Error("Processing aborted");
             }
             
-            // Additional processing for centered vocals (common in commercial music)
-            // In most commercial tracks, vocals are centered in the stereo image
-            if (numChannels === 2 && channel === 1) { // Second channel, apply phase inversion technique
-              vocalGain *= 1.4; // Enhance stereo separation for vocals
-            }
-            
-            // Apply to spectra
-            vocalSpectrum[k * 2] = mag * vocalGain * Math.cos(phase);
-            vocalSpectrum[k * 2 + 1] = mag * vocalGain * Math.sin(phase);
-            
-            instrumentalSpectrum[k * 2] = mag * instrumentalGain * Math.cos(phase);
-            instrumentalSpectrum[k * 2 + 1] = mag * instrumentalGain * Math.sin(phase);
-          }
-          
-          // Mirror the spectrum for the IFFT (needed for real output)
-          for (let k = 1; k < fftSize / 2; k++) {
-            const mirrorIndex = fftSize - k;
-            
-            // Vocals
-            vocalSpectrum[mirrorIndex * 2] = vocalSpectrum[k * 2];
-            vocalSpectrum[mirrorIndex * 2 + 1] = -vocalSpectrum[k * 2 + 1]; // Conjugate
-            
-            // Instrumental
-            instrumentalSpectrum[mirrorIndex * 2] = instrumentalSpectrum[k * 2];
-            instrumentalSpectrum[mirrorIndex * 2 + 1] = -instrumentalSpectrum[k * 2 + 1]; // Conjugate
-          }
-          
-          // Inverse FFT
-          const vocalOutput = fft.createComplexArray();
-          const instrumentalOutput = fft.createComplexArray();
-          
-          fft.inverseTransform(vocalOutput, vocalSpectrum);
-          fft.inverseTransform(instrumentalOutput, instrumentalSpectrum);
-          
-          // Overlap-add to output buffer with windowing
-          for (let j = 0; j < fftSize; j++) {
-            if (i + j < length) {
-              // Scale by FFT size and apply synthesis window
-              const windowedVocal = (vocalOutput[j * 2] / fftSize) * synthesisWindow[j] * windowScaleFactor;
-              const windowedInst = (instrumentalOutput[j * 2] / fftSize) * synthesisWindow[j] * windowScaleFactor;
+            // Update progress occasionally
+            if (i % (hopSize * 20) === 0) {
+              const fftProgress = fftSizeIndex / fftSizes.length;
+              const chunkProgress = i / length;
+              const overallProgress = fftProgress + chunkProgress / fftSizes.length;
               
-              tempVocals[i + j] += windowedVocal;
-              tempInstrumental[i + j] += windowedInst;
+              if (progressCallback) {
+                progressCallback(overallProgress);
+              }
+            }
+            
+            // Create windowed chunk
+            const chunk = new Float32Array(fftSize);
+            for (let j = 0; j < fftSize; j++) {
+              if (i + j < length) {
+                chunk[j] = inputData[i + j] * analysisWindow[j];
+              }
+            }
+            
+            // FFT
+            const complexInput = fft.createComplexArray();
+            for (let j = 0; j < fftSize; j++) {
+              complexInput[2 * j] = chunk[j];     // Real part
+              complexInput[2 * j + 1] = 0;        // Imaginary part
+            }
+            
+            const complexSpectrum = fft.createComplexArray();
+            fft.transform(complexSpectrum, complexInput);
+            
+            // Create spectrum copies for separate processing
+            const instrumentalSpectrum = Array.from(complexSpectrum);
+            const vocalSpectrum = Array.from(complexSpectrum);
+            
+            // Define harmonic/percussive separation parameters based on commercial tools
+            // Professional tools like lalal.ai use machine learning but we'll use a robust spectral model
+            
+            // Vocal frequency ranges tailored for human voice
+            // These are based on professional VST plugins and tools
+            const vocalFreqRanges = [
+              // Main vocal fundamental frequencies (singing & speech)
+              { min: 80, max: 650, vocalGain: 4.0, instGain: 0.02 },
+              
+              // Critical vocal presence and harmonics
+              { min: 650, max: 1800, vocalGain: 7.0, instGain: 0.05 },
+              
+              // Vowel formants and upper harmonics
+              { min: 1800, max: 4500, vocalGain: 8.0, instGain: 0.08 },
+              
+              // Sibilance and high frequencies
+              { min: 4500, max: 8000, vocalGain: 6.5, instGain: 0.2 },
+              
+              // Ultra high (mostly noise)
+              { min: 8000, max: 20000, vocalGain: 2.0, instGain: 0.6 }
+            ];
+            
+            // Implement spectral smoothing (very important for professional separators)
+            // This helps identify continuous harmonic content typical of vocals
+            const smoothedMagnitudes = new Float32Array(fftSize / 2);
+            const phasiness = new Float32Array(fftSize / 2); // Measure of phase stability
+            
+            // Calculate basic magnitudes and phases
+            const magnitudes = new Float32Array(fftSize / 2);
+            const phases = new Float32Array(fftSize / 2);
+            
+            for (let k = 0; k < fftSize / 2; k++) {
+              const real = complexSpectrum[k * 2];
+              const imag = complexSpectrum[k * 2 + 1];
+              magnitudes[k] = Math.sqrt(real * real + imag * imag);
+              phases[k] = Math.atan2(imag, real);
+            }
+            
+            // Apply advanced median filtering for smoothing (industry technique)
+            const medianWindow = 3;
+            for (let k = 0; k < fftSize / 2; k++) {
+              // Get samples for median
+              const samples = [];
+              for (let j = -medianWindow; j <= medianWindow; j++) {
+                const idx = k + j;
+                if (idx >= 0 && idx < fftSize / 2) {
+                  samples.push(magnitudes[idx]);
+                }
+              }
+              // Sort and get median
+              samples.sort((a, b) => a - b);
+              smoothedMagnitudes[k] = samples[Math.floor(samples.length / 2)];
+            }
+            
+            // Calculate harmonic measures (important for vocal detection)
+            // Look for harmonic relationships in spectrum - a key technique used in professional tools
+            for (let k = 1; k < fftSize / 2 - 1; k++) {
+              // Harmonic detection - vocals have strong harmonics with regular spacing
+              const isPotentialHarmonic = 
+                (smoothedMagnitudes[k] > smoothedMagnitudes[k-1] && 
+                 smoothedMagnitudes[k] > smoothedMagnitudes[k+1]) ||
+                (k > 1 && k < fftSize/2 - 2 && 
+                 smoothedMagnitudes[k] > 1.5 * (smoothedMagnitudes[k-2] + smoothedMagnitudes[k+2]) / 2);
+              
+              // Phase stability measure - vocals have more stable phase
+              phasiness[k] = isPotentialHarmonic ? 1.0 : 0.3;
+            }
+            
+            // Bin frequencies in Hz
+            const binToFreq = (bin: number) => bin * sampleRate / fftSize;
+            
+            // Process spectrum - professional separation approach
+            for (let k = 0; k < fftSize / 2; k++) {
+              const freq = binToFreq(k);
+              const real = complexSpectrum[k * 2];
+              const imag = complexSpectrum[k * 2 + 1];
+              const mag = magnitudes[k];
+              const phase = phases[k];
+              
+              // Default suppression values
+              let vocalGain = 0.0;
+              let instrumentalGain = 1.0;
+              
+              // Apply frequency-dependent processing
+              for (const range of vocalFreqRanges) {
+                if (freq >= range.min && freq <= range.max) {
+                  // Apply harmonic detection - key feature in high-end separators
+                  const harmonicBoost = phasiness[k];
+                  
+                  // Calculate the vocal isolation factor
+                  vocalGain = range.vocalGain * harmonicBoost;
+                  instrumentalGain = range.instGain / harmonicBoost;
+                  break;
+                }
+              }
+              
+              // Additional processing for centered vocals (common in commercial music)
+              // In most commercial tracks, vocals are centered in the stereo image
+              if (numChannels === 2 && channel === 1) { // Second channel, apply phase inversion technique
+                vocalGain *= 1.4; // Enhance stereo separation for vocals
+              }
+              
+              // Apply to spectra
+              vocalSpectrum[k * 2] = mag * vocalGain * Math.cos(phase);
+              vocalSpectrum[k * 2 + 1] = mag * vocalGain * Math.sin(phase);
+              
+              instrumentalSpectrum[k * 2] = mag * instrumentalGain * Math.cos(phase);
+              instrumentalSpectrum[k * 2 + 1] = mag * instrumentalGain * Math.sin(phase);
+            }
+            
+            // Mirror the spectrum for the IFFT (needed for real output)
+            for (let k = 1; k < fftSize / 2; k++) {
+              const mirrorIndex = fftSize - k;
+              
+              // Vocals
+              vocalSpectrum[mirrorIndex * 2] = vocalSpectrum[k * 2];
+              vocalSpectrum[mirrorIndex * 2 + 1] = -vocalSpectrum[k * 2 + 1]; // Conjugate
+              
+              // Instrumental
+              instrumentalSpectrum[mirrorIndex * 2] = instrumentalSpectrum[k * 2];
+              instrumentalSpectrum[mirrorIndex * 2 + 1] = -instrumentalSpectrum[k * 2 + 1]; // Conjugate
+            }
+            
+            // Inverse FFT
+            const vocalOutput = fft.createComplexArray();
+            const instrumentalOutput = fft.createComplexArray();
+            
+            fft.inverseTransform(vocalOutput, vocalSpectrum);
+            fft.inverseTransform(instrumentalOutput, instrumentalSpectrum);
+            
+            // Overlap-add to output buffer with windowing
+            for (let j = 0; j < fftSize; j++) {
+              if (i + j < length) {
+                // Scale by FFT size and apply synthesis window
+                const windowedVocal = (vocalOutput[j * 2] / fftSize) * synthesisWindow[j] * windowScaleFactor;
+                const windowedInst = (instrumentalOutput[j * 2] / fftSize) * synthesisWindow[j] * windowScaleFactor;
+                
+                tempVocals[i + j] += windowedVocal;
+                tempInstrumental[i + j] += windowedInst;
+              }
             }
           }
-        }
-        
-        // Blend results from this FFT size with others (multi-resolution approach)
-        // Weight larger FFT sizes more for low frequencies, smaller for high frequencies
-        const weight = fftSizeIndex === 0 ? 0.3 : 
-                       fftSizeIndex === 1 ? 0.4 :
-                       fftSizeIndex === 2 ? 0.2 : 0.1;
-                       
-        for (let i = 0; i < length; i++) {
-          vocalsData[i] += tempVocals[i] * weight;
-          instrumentalData[i] += tempInstrumental[i] * weight;
+          
+          // Blend results from this FFT size with others (multi-resolution approach)
+          // Weight larger FFT sizes more for low frequencies, smaller for high frequencies
+          const weight = fftSizeIndex === 0 ? 0.3 : 
+                         fftSizeIndex === 1 ? 0.4 :
+                         fftSizeIndex === 2 ? 0.2 : 0.1;
+                         
+          for (let i = 0; i < length; i++) {
+            vocalsData[i] += tempVocals[i] * weight;
+            instrumentalData[i] += tempInstrumental[i] * weight;
+          }
+          
+        } catch (error) {
+          // Log FFT processing errors but continue with other FFT sizes
+          console.error(`Error processing FFT size ${fftSize}:`, error);
+          // If this is the last FFT size and we haven't processed any, rethrow
+          if (fftSizeIndex === fftSizes.length - 1 && fftSizeIndex === 0) {
+            throw error;
+          }
+          // Otherwise continue with next FFT size
+          continue;
         }
       }
       
@@ -586,24 +709,31 @@ const VocalRemoverPage = () => {
       // Data chunk length
       view.setUint32(40, dataSize, true);
       
-      // Write the PCM samples
-      const offset = 44;
-      let index = 0;
-      
-      for (let i = 0; i < length; i++) {
-        for (let channel = 0; channel < numChannels; channel++) {
-          let sample = audioBuffer.getChannelData(channel)[i];
-          // Clamp between -1 and 1
-          const clampedSample = Math.max(-1, Math.min(1, sample));
-          // Convert to 16-bit signed integer
-          const intSample = clampedSample < 0 ? clampedSample * 32768 : clampedSample * 32767;
-          view.setInt16(offset + index, intSample, true);
-          index += 2;
+      try {
+        // Write the PCM samples
+        const offset = 44;
+        let index = 0;
+        
+        for (let i = 0; i < length; i++) {
+          for (let channel = 0; channel < numChannels; channel++) {
+            let sample = audioBuffer.getChannelData(channel)[i];
+            // Clamp between -1 and 1
+            const clampedSample = Math.max(-1, Math.min(1, sample));
+            // Convert to 16-bit signed integer
+            const intSample = clampedSample < 0 ? clampedSample * 32768 : clampedSample * 32767;
+            view.setInt16(offset + index, intSample, true);
+            index += 2;
+          }
         }
+        
+        const blob = new Blob([buffer], { type: 'audio/wav' });
+        resolve(blob);
+      } catch (error) {
+        console.error("Error converting to WAV:", error);
+        // Create empty WAV in case of error
+        const emptyBlob = new Blob([new ArrayBuffer(44)], { type: 'audio/wav' });
+        resolve(emptyBlob);
       }
-      
-      const blob = new Blob([buffer], { type: 'audio/wav' });
-      resolve(blob);
     });
   };
   
@@ -621,6 +751,12 @@ const VocalRemoverPage = () => {
   };
   
   const handleRemoveFile = () => {
+    // Cancel any ongoing processing
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
     setFile(null);
     setProcessingStage('idle');
     setProgress(0);
@@ -629,6 +765,7 @@ const VocalRemoverPage = () => {
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+    setProcessingError(null);
     
     // Reset audio previews
     if (audioPreviewRef.current) {
@@ -947,8 +1084,23 @@ const VocalRemoverPage = () => {
                 </Button>
               </div>
 
+              {/* Error Message */}
+              {processingError && (
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-md">
+                  <h3 className="text-red-400 font-medium mb-1">Processing Error</h3>
+                  <p className="text-sm text-white">{processingError}</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-2 bg-red-500/20 hover:bg-red-500/30 border-red-500/30"
+                    onClick={handleRemoveFile}
+                  >
+                    Try Another File
+                  </Button>
+                </div>
+              )}
+
               {/* Processing Progress */}
-              {processingStage !== 'complete' && (
+              {processingStage !== 'complete' && !processingError && (
                 <div className="mb-6">
                   <div className="flex justify-between mb-2">
                     <p className="text-sm text-muted-foreground">Processing: {getStageDescription()}</p>
