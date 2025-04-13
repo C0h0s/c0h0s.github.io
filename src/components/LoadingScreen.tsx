@@ -38,19 +38,19 @@ const LoadingScreen = ({ onComplete }: LoadingScreenProps) => {
       exit="exit"
     >
       <div className="flex flex-col items-center">
-        {/* Spinning logo */}
-        <div className="bg-gaming-purple rounded-2xl w-16 h-16 flex items-center justify-center mb-6">
-          <motion.span 
-            className="font-bold text-white text-3xl"
+        {/* Updated logo with new image */}
+        <div className="rounded-2xl w-16 h-16 flex items-center justify-center mb-6 overflow-hidden">
+          <motion.img 
+            src="https://cdn.discordapp.com/avatars/787701539174613022/70fa0aa8ca6d6e2568252e57d32d1b98.webp?size=1024&format=webp"
+            alt="Loading Logo"
+            className="w-full h-full object-cover"
             animate={{ rotate: 360 }}
             transition={{ 
               duration: 2, 
               repeat: Infinity, 
               ease: "linear" 
             }}
-          >
-            G
-          </motion.span>
+          />
         </div>
         
         {/* Loading spinner */}

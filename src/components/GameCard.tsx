@@ -29,7 +29,7 @@ const GameCard = ({ id, title, thumbnail, category, delay }: GameCardProps) => {
 
   return (
     <motion.div 
-      className="game-card cursor-pointer"
+      className="game-card cursor-pointer hover:scale-105 hover:shadow-xl transition-all duration-300"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: delay / 1000 }}
@@ -39,7 +39,7 @@ const GameCard = ({ id, title, thumbnail, category, delay }: GameCardProps) => {
         <img 
           src={thumbnail} 
           alt={title} 
-          className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-500"
         />
         <div className="game-card-gradient"></div>
         <div className="absolute bottom-0 left-0 p-4 w-full">
