@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Headphones, ArrowRight } from 'lucide-react';
@@ -8,7 +9,7 @@ const ToolsSection = () => {
   const navigate = useNavigate();
   const sectionRef = React.useRef<HTMLDivElement>(null);
   
-  // Tool data - keeping only the Vocal Remover
+  // Vocal Remover tool data
   const tool = {
     id: 'vocal-remover',
     title: 'Vocal Remover',
