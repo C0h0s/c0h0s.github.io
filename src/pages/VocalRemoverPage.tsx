@@ -2,17 +2,29 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Headphones, ArrowLeft, Upload, X, Music, Download } from 'lucide-react';
+import { Headphones, ArrowLeft, Upload, X, Music, Download, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
+
+// FFT.js for audio frequency analysis
+import FFT from 'fft.js';
 
 type ProcessingStage = 'idle' | 'uploading' | 'analyzing' | 'separating' | 'finalizing' | 'complete';
 
 interface AudioResult {
   instrumental: string;
   vocals: string;
+  original: string;
+}
+
+interface AudioPlayer {
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
 }
 
 const VocalRemoverPage = () => {
@@ -22,13 +34,25 @@ const VocalRemoverPage = () => {
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AudioResult | null>(null);
+  const [activeAudio, setActiveAudio] = useState<'original' | 'instrumental' | 'vocals'>('original');
+  const [volume, setVolume] = useState(100);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
   const { toast } = useToast();
+  
+  const originalPlayerRef = useRef<AudioPlayer>({isPlaying: false, currentTime: 0, duration: 0});
+  const instrumentalPlayerRef = useRef<AudioPlayer>({isPlaying: false, currentTime: 0, duration: 0});
+  const vocalsPlayerRef = useRef<AudioPlayer>({isPlaying: false, currentTime: 0, duration: 0});
   
   const audioPreviewRef = useRef<HTMLAudioElement>(null);
   const vocalPreviewRef = useRef<HTMLAudioElement>(null);
   const instrumentalPreviewRef = useRef<HTMLAudioElement>(null);
+  
+  const [isPlaying, setIsPlaying] = useState(false);
 
+  // Handle drag and drop functionality
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
@@ -70,54 +94,257 @@ const VocalRemoverPage = () => {
     }
     
     setFile(selectedFile);
+    setProcessingStage('uploading');
+    setProgress(0);
     
-    // Create audio preview
-    const audioUrl = URL.createObjectURL(selectedFile);
-    if (audioPreviewRef.current) {
-      audioPreviewRef.current.src = audioUrl;
-    }
-    
-    // Begin simulated processing
-    simulateProcessing();
+    // Process the audio file
+    processAudioFile(selectedFile);
   };
 
-  const simulateProcessing = () => {
-    // Reset progress
-    setProgress(0);
-    setProcessingStage('uploading');
-    
-    // Simulate the processing steps
-    const totalTime = 5000; // Total processing time (5 seconds for demo)
-    const steps = ['uploading', 'analyzing', 'separating', 'finalizing', 'complete'];
-    const stepTime = totalTime / (steps.length - 1);
-    
-    let currentStep = 0;
-    
-    const interval = setInterval(() => {
-      const progressPercentage = (currentStep / (steps.length - 1)) * 100;
-      setProgress(progressPercentage);
-      setProcessingStage(steps[currentStep] as ProcessingStage);
-      
-      currentStep++;
-      
-      if (currentStep >= steps.length) {
-        clearInterval(interval);
-        
-        // In a real implementation, this would be actual separated audio
-        // For demo, we'll just use the same audio file for both
-        const audioUrl = URL.createObjectURL(file!);
-        
-        setResult({
-          instrumental: audioUrl,
-          vocals: audioUrl,
-        });
-        
-        toast({
-          title: "Processing complete",
-          description: "Your audio has been successfully separated!",
-        });
+  const processAudioFile = async (audioFile: File) => {
+    try {
+      // Initialize AudioContext if not already done
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-    }, stepTime);
+
+      // Read file as ArrayBuffer
+      const arrayBuffer = await readFileAsArrayBuffer(audioFile);
+      setProcessingStage('analyzing');
+      setProgress(20);
+
+      // Decode audio data
+      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      audioBufferRef.current = audioBuffer;
+      setProcessingStage('separating');
+      setProgress(50);
+
+      // Perform vocal separation
+      const { instrumentalBuffer, vocalsBuffer } = await separateVocals(audioBuffer);
+      
+      setProcessingStage('finalizing');
+      setProgress(80);
+
+      // Convert separated AudioBuffers to blobs
+      const originalBlob = await audioBufferToWav(audioBuffer);
+      const instrumentalBlob = await audioBufferToWav(instrumentalBuffer);
+      const vocalsBlob = await audioBufferToWav(vocalsBuffer);
+      
+      // Create object URLs for the audio elements
+      const originalUrl = URL.createObjectURL(originalBlob);
+      const instrumentalUrl = URL.createObjectURL(instrumentalBlob);
+      const vocalsUrl = URL.createObjectURL(vocalsBlob);
+
+      // Set up audio elements
+      if (audioPreviewRef.current) {
+        audioPreviewRef.current.src = originalUrl;
+      }
+      if (instrumentalPreviewRef.current) {
+        instrumentalPreviewRef.current.src = instrumentalUrl;
+      }
+      if (vocalPreviewRef.current) {
+        vocalPreviewRef.current.src = vocalsUrl;
+      }
+
+      // Set result
+      setResult({
+        original: originalUrl,
+        instrumental: instrumentalUrl,
+        vocals: vocalsUrl
+      });
+      
+      setProcessingStage('complete');
+      setProgress(100);
+      
+      toast({
+        title: "Processing complete",
+        description: "Your audio has been successfully separated!",
+      });
+    } catch (error) {
+      console.error('Error processing audio:', error);
+      toast({
+        title: "Processing Error",
+        description: "There was an error processing your audio file.",
+        variant: "destructive"
+      });
+      setProcessingStage('idle');
+    }
+  };
+
+  // Utility function to read file as ArrayBuffer
+  const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.result instanceof ArrayBuffer) {
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to read file as ArrayBuffer"));
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Function to separate vocals from audio
+  const separateVocals = async (audioBuffer: AudioBuffer): Promise<{instrumentalBuffer: AudioBuffer, vocalsBuffer: AudioBuffer}> => {
+    // Basic vocal separation using frequency filtering
+    const numChannels = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length;
+    const sampleRate = audioBuffer.sampleRate;
+    
+    // Create new AudioBuffers for the separated audio
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const instrumentalBuffer = audioContext.createBuffer(numChannels, length, sampleRate);
+    const vocalsBuffer = audioContext.createBuffer(numChannels, length, sampleRate);
+    
+    // Process each channel
+    for (let channel = 0; channel < numChannels; channel++) {
+      const inputData = audioBuffer.getChannelData(channel);
+      const instrumentalData = instrumentalBuffer.getChannelData(channel);
+      const vocalsData = vocalsBuffer.getChannelData(channel);
+      
+      // FFT params
+      const fftSize = 2048;
+      const fft = new FFT(fftSize);
+      const halfSize = fftSize / 2;
+      
+      // Process in chunks
+      for (let i = 0; i < length; i += fftSize) {
+        // Create chunk with zero padding if needed
+        const chunk = new Float32Array(fftSize);
+        for (let j = 0; j < fftSize; j++) {
+          chunk[j] = i + j < length ? inputData[i + j] : 0;
+        }
+        
+        // Apply window function (Hann)
+        for (let j = 0; j < fftSize; j++) {
+          chunk[j] *= 0.5 * (1 - Math.cos(2 * Math.PI * j / fftSize));
+        }
+        
+        // Prepare for FFT
+        const complexInput = new Array(fftSize * 2);
+        for (let j = 0; j < fftSize; j++) {
+          complexInput[2 * j] = chunk[j];
+          complexInput[2 * j + 1] = 0;
+        }
+        
+        // Perform FFT
+        const complexOutput = fft.createComplexArray();
+        fft.transform(complexOutput, complexInput);
+        
+        // Apply vocal/instrumental separation in frequency domain
+        // Human voice is typically in 80-255 Hz range (fundamental)
+        const vocalRange = { min: Math.floor(80 / sampleRate * fftSize), max: Math.ceil(255 / sampleRate * fftSize) };
+        
+        // Copy complexOutput to separate arrays for manipulation
+        const instrumentalSpectrum = [...complexOutput];
+        const vocalSpectrum = [...complexOutput];
+        
+        // Filter spectrums
+        for (let j = 0; j < fftSize; j++) {
+          const idx = j * 2;
+          
+          // Suppress vocal frequency range in instrumental
+          if (j > vocalRange.min && j < vocalRange.max) {
+            instrumentalSpectrum[idx] *= 0.2;     // Real part
+            instrumentalSpectrum[idx + 1] *= 0.2; // Imaginary part
+          } else {
+            vocalSpectrum[idx] *= 0.3;      // Real part
+            vocalSpectrum[idx + 1] *= 0.3;  // Imaginary part
+          }
+        }
+        
+        // Inverse FFT for instrumental
+        const instrumentalOutput = fft.createComplexArray();
+        fft.inverseTransform(instrumentalOutput, instrumentalSpectrum);
+        
+        // Inverse FFT for vocals
+        const vocalOutput = fft.createComplexArray();
+        fft.inverseTransform(vocalOutput, vocalSpectrum);
+        
+        // Copy result back to output buffers with overlap-add
+        for (let j = 0; j < fftSize; j++) {
+          if (i + j < length) {
+            instrumentalData[i + j] = instrumentalOutput[j * 2] / fftSize;
+            vocalsData[i + j] = vocalOutput[j * 2] / fftSize;
+          }
+        }
+      }
+    }
+    
+    return { instrumentalBuffer, vocalsBuffer };
+  };
+
+  // Utility function to convert AudioBuffer to WAV Blob
+  const audioBufferToWav = (audioBuffer: AudioBuffer): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const numChannels = audioBuffer.numberOfChannels;
+      const length = audioBuffer.length;
+      const sampleRate = audioBuffer.sampleRate;
+      const bitsPerSample = 16;
+      const bytesPerSample = bitsPerSample / 8;
+      const blockAlign = numChannels * bytesPerSample;
+      const byteRate = sampleRate * blockAlign;
+      const dataSize = length * blockAlign;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+      
+      // RIFF identifier
+      writeString(view, 0, 'RIFF');
+      // File length
+      view.setUint32(4, 36 + dataSize, true);
+      // RIFF type
+      writeString(view, 8, 'WAVE');
+      // Format chunk identifier
+      writeString(view, 12, 'fmt ');
+      // Format chunk length
+      view.setUint32(16, 16, true);
+      // Sample format (1 is PCM)
+      view.setUint16(20, 1, true);
+      // Channel count
+      view.setUint16(22, numChannels, true);
+      // Sample rate
+      view.setUint32(24, sampleRate, true);
+      // Byte rate (sample rate * block align)
+      view.setUint32(28, byteRate, true);
+      // Block align (channel count * bytes per sample)
+      view.setUint16(32, blockAlign, true);
+      // Bits per sample
+      view.setUint16(34, bitsPerSample, true);
+      // Data chunk identifier
+      writeString(view, 36, 'data');
+      // Data chunk length
+      view.setUint32(40, dataSize, true);
+      
+      // Write the PCM samples
+      const offset = 44;
+      const volume = 1;
+      let index = 0;
+      
+      for (let i = 0; i < length; i++) {
+        for (let channel = 0; channel < numChannels; channel++) {
+          const sample = audioBuffer.getChannelData(channel)[i] * volume;
+          // Clamp between -1 and 1
+          const clampedSample = Math.max(-1, Math.min(1, sample));
+          // Convert to 16-bit signed integer
+          const intSample = clampedSample < 0 ? clampedSample * 32768 : clampedSample * 32767;
+          view.setInt16(offset + index, intSample, true);
+          index += 2;
+        }
+      }
+      
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      resolve(blob);
+    });
+  };
+  
+  // Helper function to write a string to a DataView
+  const writeString = (view: DataView, offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
   };
   
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,19 +358,38 @@ const VocalRemoverPage = () => {
     setProcessingStage('idle');
     setProgress(0);
     setResult(null);
+    setActiveAudio('original');
+    setIsPlaying(false);
     
     // Reset audio previews
     if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
       audioPreviewRef.current.src = '';
+    }
+    if (instrumentalPreviewRef.current) {
+      instrumentalPreviewRef.current.pause();
+      instrumentalPreviewRef.current.src = '';
+    }
+    if (vocalPreviewRef.current) {
+      vocalPreviewRef.current.pause();
+      vocalPreviewRef.current.src = '';
     }
   };
   
-  const handleDownload = (type: 'instrumental' | 'vocals') => {
+  const handleDownload = (type: 'original' | 'instrumental' | 'vocals') => {
     if (!result) return;
     
+    const urls = {
+      original: result.original,
+      instrumental: result.instrumental,
+      vocals: result.vocals
+    };
+    
+    const fileName = file?.name.replace(/\.[^/.]+$/, "") || "audio";
+    
     const link = document.createElement('a');
-    link.href = type === 'instrumental' ? result.instrumental : result.vocals;
-    link.download = `${file?.name.split('.')[0]}_${type}.mp3`;
+    link.href = urls[type];
+    link.download = `${fileName}_${type}.wav`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -152,6 +398,82 @@ const VocalRemoverPage = () => {
       title: "Download started",
       description: `Your ${type} track is downloading.`
     });
+  };
+
+  const togglePlayPause = () => {
+    if (!result) return;
+    
+    let audioElement: HTMLAudioElement | null = null;
+    
+    switch (activeAudio) {
+      case 'original':
+        audioElement = audioPreviewRef.current;
+        break;
+      case 'instrumental':
+        audioElement = instrumentalPreviewRef.current;
+        break;
+      case 'vocals':
+        audioElement = vocalPreviewRef.current;
+        break;
+    }
+    
+    if (!audioElement) return;
+    
+    if (isPlaying) {
+      audioElement.pause();
+    } else {
+      // Pause all audio elements first
+      if (audioPreviewRef.current) audioPreviewRef.current.pause();
+      if (instrumentalPreviewRef.current) instrumentalPreviewRef.current.pause();
+      if (vocalPreviewRef.current) vocalPreviewRef.current.pause();
+      
+      // Play the selected one
+      audioElement.play();
+    }
+    
+    setIsPlaying(!isPlaying);
+  };
+  
+  const handleAudioTypeChange = (value: 'original' | 'instrumental' | 'vocals') => {
+    if (isPlaying) {
+      // Pause all audio elements
+      if (audioPreviewRef.current) audioPreviewRef.current.pause();
+      if (instrumentalPreviewRef.current) instrumentalPreviewRef.current.pause();
+      if (vocalPreviewRef.current) vocalPreviewRef.current.pause();
+      
+      // Set the new active audio and play it
+      setActiveAudio(value);
+      
+      let audioElement: HTMLAudioElement | null = null;
+      
+      switch (value) {
+        case 'original':
+          audioElement = audioPreviewRef.current;
+          break;
+        case 'instrumental':
+          audioElement = instrumentalPreviewRef.current;
+          break;
+        case 'vocals':
+          audioElement = vocalPreviewRef.current;
+          break;
+      }
+      
+      if (audioElement) {
+        audioElement.play();
+      }
+    } else {
+      setActiveAudio(value);
+    }
+  };
+
+  const handleVolumeChange = (newVolume: number[]) => {
+    const volumeValue = newVolume[0];
+    setVolume(volumeValue);
+    
+    // Update volume for all audio elements
+    if (audioPreviewRef.current) audioPreviewRef.current.volume = volumeValue / 100;
+    if (instrumentalPreviewRef.current) instrumentalPreviewRef.current.volume = volumeValue / 100;
+    if (vocalPreviewRef.current) vocalPreviewRef.current.volume = volumeValue / 100;
   };
 
   const getStageDescription = () => {
@@ -277,17 +599,6 @@ const VocalRemoverPage = () => {
                 </Button>
               </div>
 
-              {/* Audio Preview */}
-              <div className="mb-6 bg-black/20 rounded-lg p-3">
-                <audio 
-                  ref={audioPreviewRef} 
-                  controls 
-                  className="w-full focus:outline-none"
-                >
-                  Your browser does not support the audio element.
-                </audio>
-              </div>
-
               {/* Processing Progress */}
               {processingStage !== 'complete' && (
                 <div className="mb-6">
@@ -299,49 +610,91 @@ const VocalRemoverPage = () => {
                 </div>
               )}
 
-              {/* Results */}
+              {/* Audio Player and Results */}
               {processingStage === 'complete' && result && (
                 <div className="space-y-6">
-                  <div>
-                    <h4 className="text-sm font-medium text-white mb-2">Instrumental Track</h4>
-                    <div className="bg-black/20 rounded-lg p-3 flex items-center">
-                      <audio 
-                        ref={instrumentalPreviewRef} 
-                        src={result.instrumental}
-                        controls 
-                        className="w-full focus:outline-none"
+                  {/* Hidden audio elements */}
+                  <audio ref={audioPreviewRef} src={result.original} onEnded={() => setIsPlaying(false)} />
+                  <audio ref={instrumentalPreviewRef} src={result.instrumental} onEnded={() => setIsPlaying(false)} />
+                  <audio ref={vocalPreviewRef} src={result.vocals} onEnded={() => setIsPlaying(false)} />
+                  
+                  {/* Audio Player Controls */}
+                  <div className="bg-black/30 rounded-lg p-6">
+                    <div className="flex justify-center mb-5">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="w-12 h-12 rounded-full bg-gaming-purple text-white border-none hover:bg-gaming-purple/80"
+                        onClick={togglePlayPause}
                       >
-                        Your browser does not support the audio element.
-                      </audio>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="ml-2 flex-shrink-0 text-white hover:bg-white/10"
-                        onClick={() => handleDownload('instrumental')}
-                      >
-                        <Download size={18} />
+                        {isPlaying ? <Pause size={20} /> : <Play size={20} />}
                       </Button>
+                    </div>
+                    
+                    {/* Audio Type Selection */}
+                    <div className="mb-5">
+                      <RadioGroup 
+                        value={activeAudio}
+                        onValueChange={(value) => handleAudioTypeChange(value as 'original' | 'instrumental' | 'vocals')}
+                        className="flex justify-center space-x-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="original" id="original" />
+                          <Label htmlFor="original" className="text-white cursor-pointer">Original</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="instrumental" id="instrumental" />
+                          <Label htmlFor="instrumental" className="text-white cursor-pointer">Instrumental</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="vocals" id="vocals" />
+                          <Label htmlFor="vocals" className="text-white cursor-pointer">Vocals</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    
+                    {/* Volume Control */}
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm text-white">Volume</span>
+                      <Slider
+                        className="flex-1"
+                        value={[volume]}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onValueChange={handleVolumeChange}
+                      />
+                      <span className="text-sm text-white w-8 text-right">{volume}%</span>
                     </div>
                   </div>
                   
-                  <div>
-                    <h4 className="text-sm font-medium text-white mb-2">Vocals Track</h4>
-                    <div className="bg-black/20 rounded-lg p-3 flex items-center">
-                      <audio 
-                        ref={vocalPreviewRef} 
-                        src={result.vocals}
-                        controls 
-                        className="w-full focus:outline-none"
-                      >
-                        Your browser does not support the audio element.
-                      </audio>
+                  {/* Download Options */}
+                  <div className="bg-black/20 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-white mb-3">Download Options</h4>
+                    <div className="flex flex-wrap gap-3">
                       <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="ml-2 flex-shrink-0 text-white hover:bg-white/10"
+                        variant="outline" 
+                        className="bg-gaming-dark/50 hover:bg-gaming-dark"
+                        onClick={() => handleDownload('original')}
+                      >
+                        <Download size={16} className="mr-2" />
+                        Original
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="bg-gaming-dark/50 hover:bg-gaming-dark"
+                        onClick={() => handleDownload('instrumental')}
+                      >
+                        <Download size={16} className="mr-2" />
+                        Instrumental
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="bg-gaming-dark/50 hover:bg-gaming-dark"
                         onClick={() => handleDownload('vocals')}
                       >
-                        <Download size={18} />
+                        <Download size={16} className="mr-2" />
+                        Vocals
                       </Button>
                     </div>
                   </div>
@@ -361,11 +714,11 @@ const VocalRemoverPage = () => {
             <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
               <li>Upload an audio file by dragging and dropping or clicking the upload area</li>
               <li>Wait for the processing to complete (this usually takes a few seconds)</li>
-              <li>Preview both the instrumental and vocals tracks</li>
-              <li>Download the separated tracks using the download buttons</li>
+              <li>Use the player controls to switch between original audio, instrumental, and vocals</li>
+              <li>Download any of the separated audio tracks using the download buttons</li>
             </ol>
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>Note: This tool works best with high-quality audio files with clear separation between vocals and instrumentals.</p>
+              <p>Note: The vocal separation technology uses frequency analysis to separate audio and works best with clearly recorded music.</p>
             </div>
           </motion.div>
         </motion.div>

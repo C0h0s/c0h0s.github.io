@@ -34,7 +34,8 @@ const Index = () => {
       <Navbar />
       
       <main className="pt-24 pb-12 px-4">
-        <div className="container mx-auto">          
+        <div className="container mx-auto">
+          <h2 className="text-2xl font-bold text-white mb-6">Featured Games</h2>
           <motion.div 
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
             variants={containerVariants}
