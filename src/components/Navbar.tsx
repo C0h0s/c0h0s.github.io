@@ -10,7 +10,7 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 const Navbar = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [onlineUsers, setOnlineUsers] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState(1); // Start with 1 (current user)
   const [searchResults, setSearchResults] = useState<typeof games>([]);
   const navigate = useNavigate();
 
@@ -27,22 +27,48 @@ const Navbar = () => {
     }
   }, [searchQuery]);
 
-  // Effect to simulate online users
+  // Effect to track real online users
   useEffect(() => {
-    // Generate a random number between 80 and 250
-    const randomUsers = Math.floor(Math.random() * (250 - 80 + 1)) + 80;
-    setOnlineUsers(randomUsers);
-
-    // Simulate fluctuations in user count
-    const interval = setInterval(() => {
-      setOnlineUsers(prev => {
-        const change = Math.floor(Math.random() * 5) - 2; // Random number between -2 and 2
-        const newCount = prev + change;
-        return newCount > 50 ? newCount : 50;
+    // Create a unique session ID for this user
+    const sessionId = Math.random().toString(36).substring(2, 15);
+    
+    // Function to send heartbeat to indicate user is online
+    const sendHeartbeat = () => {
+      // Get current active users from localStorage
+      const currentTime = new Date().getTime();
+      let activeUsers = JSON.parse(localStorage.getItem('activeUsers') || '{}');
+      
+      // Clean up expired sessions (older than 1 minute)
+      Object.keys(activeUsers).forEach(id => {
+        if (currentTime - activeUsers[id] > 60000) {
+          delete activeUsers[id];
+        }
       });
-    }, 5000);
-
-    return () => clearInterval(interval);
+      
+      // Add this user's heartbeat
+      activeUsers[sessionId] = currentTime;
+      
+      // Save back to localStorage
+      localStorage.setItem('activeUsers', JSON.stringify(activeUsers));
+      
+      // Update the counter
+      setOnlineUsers(Object.keys(activeUsers).length);
+    };
+    
+    // Send initial heartbeat
+    sendHeartbeat();
+    
+    // Set up interval for regular heartbeats
+    const heartbeatInterval = setInterval(sendHeartbeat, 10000); // Every 10 seconds
+    
+    return () => {
+      clearInterval(heartbeatInterval);
+      
+      // Clean up this user from active users on unmount
+      const activeUsers = JSON.parse(localStorage.getItem('activeUsers') || '{}');
+      delete activeUsers[sessionId];
+      localStorage.setItem('activeUsers', JSON.stringify(activeUsers));
+    };
   }, []);
 
   const handleSelectGame = (gameId: string) => {
@@ -68,8 +94,9 @@ const Navbar = () => {
             <div 
               className={`flex items-center bg-secondary rounded-full overflow-hidden transition-all duration-300 ${searchOpen ? 'w-64' : 'w-10'}`}
               onClick={() => !searchOpen && setSearchOpen(true)}
+              style={{ cursor: 'pointer' }}
             >
-              <button className="p-2 text-white">
+              <button className="p-2 text-white" style={{ cursor: 'pointer' }}>
                 <Search size={20} />
               </button>
               {searchOpen && (
@@ -81,6 +108,7 @@ const Navbar = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
+                    style={{ cursor: 'text' }}
                   />
                 </>
               )}
@@ -98,6 +126,7 @@ const Navbar = () => {
                             key={game.id} 
                             onSelect={() => handleSelectGame(game.id)}
                             className="cursor-pointer"
+                            style={{ cursor: 'pointer' }}
                           >
                             <div className="flex items-center space-x-2">
                               <img 
