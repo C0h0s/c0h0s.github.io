@@ -9,11 +9,11 @@ const ToolsSection = () => {
   const navigate = useNavigate();
   const sectionRef = React.useRef<HTMLDivElement>(null);
   
-  // Vocal Remover tool data
+  // Vocal Remover tool data with updated description
   const tool = {
     id: 'vocal-remover',
     title: 'Advanced AI Vocal Remover',
-    description: 'Separate vocals from instrumentals using advanced audio processing techniques. Works with files up to 10MB with high-quality separation.',
+    description: 'Separate vocals from instrumentals with high-quality phase cancellation and spectral filtering techniques. Perfect for karaoke, remixes, and audio editing. Works with files up to 10MB.',
     icon: <AudioWaveform size={24} />,
     path: '/vocalremover',
     color: 'from-purple-500 to-pink-500'

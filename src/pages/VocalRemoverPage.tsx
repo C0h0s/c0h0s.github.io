@@ -11,8 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import AudioPlayer from '@/components/AudioPlayer';
 import { 
   loadAudioFromFile, 
-  processVocalIsolation, 
-  processInstrumentalIsolation,
+  processVocalIsolation,
+  processAdvancedInstrumentalExtraction,
   audioBufferToWav
 } from '@/utils/audioProcessing';
 
@@ -95,7 +95,7 @@ const VocalRemoverPage = () => {
     processAudioFile(selectedFile);
   };
 
-  // Advanced audio processing with real separation
+  // Advanced audio processing with enhanced separation techniques
   const processAudioFile = async (audioFile: File) => {
     try {
       // Create new abort controller for this processing
@@ -113,21 +113,29 @@ const VocalRemoverPage = () => {
       const audioBuffer = await loadAudioFromFile(audioFile);
       setProgress(30);
       
-      // Move to processing stage
+      // Move to processing stage with detailed progress updates
       setProcessingStage('processing');
+      toast({
+        title: "Processing started",
+        description: "Applying advanced vocal isolation techniques...",
+      });
       
-      // Process vocals (with real separation)
+      // Process vocals with enhanced algorithm
       setProgress(40);
       const vocalBuffer = await processVocalIsolation(audioBuffer);
       setProgress(60);
+      toast({
+        title: "Vocal Isolation Complete",
+        description: "Now separating instrumental tracks...",
+      });
       
       // Check if aborted
       if (abortControllerRef.current?.signal.aborted) {
         return;
       }
       
-      // Process instrumental (with real separation)
-      const instrumentalBuffer = await processInstrumentalIsolation(audioBuffer);
+      // Process instrumental with enhanced phase cancellation
+      const instrumentalBuffer = await processAdvancedInstrumentalExtraction(audioBuffer);
       setProgress(80);
       
       // Check if aborted
@@ -156,7 +164,7 @@ const VocalRemoverPage = () => {
       
       toast({
         title: "Processing complete",
-        description: "Your audio has been separated successfully!",
+        description: "Your audio has been separated with advanced techniques!",
       });
       
     } catch (error) {
@@ -254,7 +262,7 @@ const VocalRemoverPage = () => {
         </Button>
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Advanced Vocal Remover</h1>
         <p className="text-muted-foreground max-w-2xl">
-          Separate vocals from instrumentals with advanced AI-powered processing. Works best with files under 10MB.
+          Separate vocals from instrumentals using advanced phase cancellation and spectral filtering. Works best with stereo audio files under 10MB.
         </p>
       </div>
       
@@ -360,6 +368,7 @@ const VocalRemoverPage = () => {
                     value={activeAudio}
                     onValueChange={(value: any) => {
                       setActiveAudio(value as 'original' | 'instrumental' | 'vocals');
+                      setCurrentlyPlaying(null); // Stop playing when switching tracks
                     }}
                     className="space-y-2"
                   >
