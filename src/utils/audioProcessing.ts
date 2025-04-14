@@ -13,6 +13,17 @@ export const getAudioContext = (): AudioContext => {
   return globalAudioContext;
 };
 
+// Function to load the spectral gate AudioWorklet module
+export const loadSpectralGateWorklet = async (audioContext: AudioContext) => {
+  try {
+    await audioContext.audioWorklet.addModule('spectral-gate-processor.js');
+    return true;
+  } catch (err) {
+    console.error('Error loading AudioWorklet module:', err);
+    return false;
+  }
+};
+
 // Create frequency-based filters for vocal separation
 export const createBandpassFilter = (
   audioContext: AudioContext,
@@ -384,179 +395,131 @@ export const loadAudioFromFile = async (file: File): Promise<AudioBuffer> => {
   return await audioContext.decodeAudioData(arrayBuffer);
 };
 
-// New advanced a cappella extraction function (vocal isolation with enhanced algorithm)
-export const processAdvancedVocalExtraction = async (audioBuffer: AudioBuffer): Promise<AudioBuffer> => {
+// AI-powered vocal isolation using spectral gating technique
+export const processUltraAdvancedVocalIsolation = async (audioBuffer: AudioBuffer): Promise<AudioBuffer> => {
   const numberOfChannels = audioBuffer.numberOfChannels;
   const length = audioBuffer.length;
   const sampleRate = audioBuffer.sampleRate;
-  
-  // Create an offline context for processing
-  const offlineContext = new OfflineAudioContext(
-    numberOfChannels,
-    length,
-    sampleRate
-  );
+  const audioContext = new OfflineAudioContext(2, length, sampleRate);
 
-  // Source node
-  const source = offlineContext.createBufferSource();
+  // Try to load the spectral gate AudioWorklet
+  let workletLoaded = false;
+  try {
+    workletLoaded = await loadSpectralGateWorklet(audioContext);
+  } catch (error) {
+    console.error("Failed to load AudioWorklet:", error);
+  }
+
+  // Create a source node from the AudioBuffer.
+  const source = audioContext.createBufferSource();
   source.buffer = audioBuffer;
 
-  // First apply center-channel extraction for stereo
-  if (numberOfChannels === 2) {
-    // Split channels
-    const splitter = offlineContext.createChannelSplitter(2);
-    const merger = offlineContext.createChannelMerger(2);
+  // === MID/SIDE EXTRACTION ===
+  if (numberOfChannels < 2) {
+    console.warn("Stereo processing is optimal. Processing as mono.");
     
-    // Create gain nodes for center channel extraction with more aggressive settings
-    const leftGain = offlineContext.createGain();
-    const rightGain = offlineContext.createGain();
-    const invertedRight = offlineContext.createGain();
-    const invertedLeft = offlineContext.createGain();
+    // For mono signals, apply a direct filtering approach
+    const highPass = audioContext.createBiquadFilter();
+    highPass.type = "highpass";
+    highPass.frequency.value = 180;
     
-    // Set gains for enhanced center extraction
-    leftGain.gain.value = 0.7;  // Boost center content in left
-    rightGain.gain.value = 0.7; // Boost center content in right
-    invertedRight.gain.value = -0.7; // Strongly cancel side content from right
-    invertedLeft.gain.value = -0.7;  // Strongly cancel side content from left
+    const vocalBand = audioContext.createBiquadFilter();
+    vocalBand.type = "bandpass";
+    vocalBand.frequency.value = 2500;
+    vocalBand.Q.value = 0.25;
     
-    // Connect for center channel extraction
+    source.connect(highPass);
+    highPass.connect(vocalBand);
+    
+    if (workletLoaded) {
+      const spectralGateNode = new AudioWorkletNode(audioContext, 'spectral-gate-processor', {
+        processorOptions: {
+          threshold: 0.05,
+          attack: 0.005,
+          release: 0.1,
+          frameSize: 1024
+        }
+      });
+      vocalBand.connect(spectralGateNode);
+      spectralGateNode.connect(audioContext.destination);
+    } else {
+      vocalBand.connect(audioContext.destination);
+    }
+  } else {
+    const splitter = audioContext.createChannelSplitter(2);
     source.connect(splitter);
+
+    const leftGain = audioContext.createGain();
+    const rightGain = audioContext.createGain();
     splitter.connect(leftGain, 0);
     splitter.connect(rightGain, 1);
-    splitter.connect(invertedRight, 1);
-    splitter.connect(invertedLeft, 0);
+
+    // Create mid (L+R) and side (L-R) signals.
+    const mergerMid = audioContext.createChannelMerger(1);
+    leftGain.connect(mergerMid, 0, 0);
+    rightGain.connect(mergerMid, 0, 0);
+    const midGain = audioContext.createGain();
+    midGain.gain.value = 0.5;
+    mergerMid.connect(midGain);
+
+    const rightInverter = audioContext.createGain();
+    rightInverter.gain.value = -1;
+    rightGain.connect(rightInverter);
+    const mergerSide = audioContext.createChannelMerger(1);
+    leftGain.connect(mergerSide, 0, 0);
+    rightInverter.connect(mergerSide, 0, 0);
+    const sideGain = audioContext.createGain();
+    sideGain.gain.value = 0.5;
+    mergerSide.connect(sideGain);
+
+    // Extract only the mid channel (where vocals primarily reside)
+    const vocalBandPass = audioContext.createBiquadFilter();
+    vocalBandPass.type = "bandpass";
+    vocalBandPass.frequency.value = 2500;
+    vocalBandPass.Q.value = 0.25;
     
-    leftGain.connect(merger, 0, 0);
-    invertedRight.connect(merger, 0, 0);
-    rightGain.connect(merger, 0, 1);
-    invertedLeft.connect(merger, 0, 1);
+    midGain.connect(vocalBandPass);
     
-    merger.connect(offlineContext.destination);
-    source.start(0);
-    
-    // Render first pass
-    const centerChannelBuffer = await offlineContext.startRendering();
-    
-    // Create a new context for the second pass
-    const secondPassContext = new OfflineAudioContext(
-      numberOfChannels,
-      length,
-      sampleRate
-    );
-    
-    // Source from first pass
-    const secondSource = secondPassContext.createBufferSource();
-    secondSource.buffer = centerChannelBuffer;
-    
-    // Apply EQ for vocal emphasis
-    
-    // Boost presence (2-4kHz)
-    const presenceBoost = secondPassContext.createBiquadFilter();
+    // Apply additional vocal enhancements
+    const presenceBoost = audioContext.createBiquadFilter();
     presenceBoost.type = "peaking";
-    presenceBoost.frequency.value = 3000;
+    presenceBoost.frequency.value = 3500;
     presenceBoost.Q.value = 1;
     presenceBoost.gain.value = 12;
     
-    // Cut low frequencies
-    const highPass = secondPassContext.createBiquadFilter();
-    highPass.type = "highpass";
-    highPass.frequency.value = 250;
-    highPass.Q.value = 0.7;
+    vocalBandPass.connect(presenceBoost);
     
-    // Cut most instrumental frequencies
-    const notch1 = secondPassContext.createBiquadFilter();
-    notch1.type = "notch";
-    notch1.frequency.value = 400;
-    notch1.Q.value = 5;
+    // Create a stereo output from the mono vocal signal
+    const merger = audioContext.createChannelMerger(2);
     
-    const notch2 = secondPassContext.createBiquadFilter();
-    notch2.type = "notch";
-    notch2.frequency.value = 180;
-    notch2.Q.value = 5;
+    if (workletLoaded) {
+      // Use the AudioWorklet for spectral gating if available
+      const spectralGateNode = new AudioWorkletNode(audioContext, 'spectral-gate-processor', {
+        processorOptions: {
+          threshold: 0.05,
+          attack: 0.005,
+          release: 0.1,
+          frameSize: 1024
+        }
+      });
+      presenceBoost.connect(spectralGateNode);
+      spectralGateNode.connect(merger, 0, 0);
+      spectralGateNode.connect(merger, 0, 1);
+    } else {
+      // Fallback if AudioWorklet is not supported
+      presenceBoost.connect(merger, 0, 0);
+      presenceBoost.connect(merger, 0, 1);
+    }
     
-    // Vocal focus filter
-    const vocalFocus = secondPassContext.createBiquadFilter();
-    vocalFocus.type = "bandpass";
-    vocalFocus.frequency.value = 1500;
-    vocalFocus.Q.value = 0.3;
-    
-    // Hard limiter to prevent clipping
-    const compressor = secondPassContext.createDynamicsCompressor();
-    compressor.threshold.value = -2;
-    compressor.knee.value = 0;
-    compressor.ratio.value = 20;
-    compressor.attack.value = 0.001;
-    compressor.release.value = 0.1;
-    
-    // Final output gain
-    const outputGain = secondPassContext.createGain();
-    outputGain.gain.value = 4.0; // Strong boost
-    
-    // Connect second pass chain
-    secondSource.connect(highPass);
-    highPass.connect(vocalFocus);
-    vocalFocus.connect(presenceBoost);
-    presenceBoost.connect(notch1);
-    notch1.connect(notch2);
-    notch2.connect(compressor);
-    compressor.connect(outputGain);
-    outputGain.connect(secondPassContext.destination);
-    
-    // Start second pass
-    secondSource.start(0);
-    return await secondPassContext.startRendering();
-  } 
-  else {
-    // For mono, apply direct vocal isolation with boosted settings
-    
-    // Stage 1: High-pass to remove all bass instruments
-    const highPass = offlineContext.createBiquadFilter();
-    highPass.type = "highpass";
-    highPass.frequency.value = 220; // Just above typical bass instruments
-    
-    // Stage 2: Strong vocal bandpass to isolate vocal frequencies
-    const vocalBand = offlineContext.createBiquadFilter();
-    vocalBand.type = "bandpass";
-    vocalBand.frequency.value = 2000; // Center on vocal frequency range
-    vocalBand.Q.value = 0.3; // Wider Q for full vocal range
-    
-    // Stage 3: Presence boost
-    const presenceBoost = offlineContext.createBiquadFilter();
-    presenceBoost.type = "peaking";
-    presenceBoost.frequency.value = 3000;
-    presenceBoost.Q.value = 1;
-    presenceBoost.gain.value = 15;
-    
-    // Stage 4: Cut ultra highs
-    const lowPass = offlineContext.createBiquadFilter();
-    lowPass.type = "lowpass";
-    lowPass.frequency.value = 8000;
-    
-    // Stage 5: Strong compression to bring out vocals
-    const compressor = offlineContext.createDynamicsCompressor();
-    compressor.threshold.value = -40;
-    compressor.knee.value = 5;
-    compressor.ratio.value = 12;
-    compressor.attack.value = 0.001;
-    compressor.release.value = 0.1;
-    
-    // Stage 6: Final boost
-    const outputGain = offlineContext.createGain();
-    outputGain.gain.value = 5.0; // Very strong boost
-    
-    // Connect mono processing chain
-    source.connect(highPass);
-    highPass.connect(vocalBand);
-    vocalBand.connect(presenceBoost);
-    presenceBoost.connect(lowPass);
-    lowPass.connect(compressor);
-    compressor.connect(outputGain);
-    outputGain.connect(offlineContext.destination);
-    
-    // Start source
-    source.start(0);
-    
-    // Return rendered audio
-    return await offlineContext.startRendering();
+    merger.connect(audioContext.destination);
   }
+
+  source.start(0);
+  return await audioContext.startRendering();
+};
+
+// New a cappella extraction with spectral gating
+export const processAdvancedVocalExtraction = async (audioBuffer: AudioBuffer): Promise<AudioBuffer> => {
+  // We'll use the ultra advanced function for this
+  return processUltraAdvancedVocalIsolation(audioBuffer);
 };

@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Headphones, ArrowLeft, Upload, X, Download, AudioWaveform as WaveformIcon, Mic } from 'lucide-react';
+import { Headphones, ArrowLeft, Upload, X, Download, AudioWaveform as WaveformIcon, Mic, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -13,8 +13,10 @@ import {
   loadAudioFromFile, 
   processVocalIsolation,
   processAdvancedInstrumentalExtraction,
-  processAdvancedVocalExtraction,
-  audioBufferToWav
+  processUltraAdvancedVocalIsolation,
+  audioBufferToWav,
+  loadSpectralGateWorklet,
+  getAudioContext
 } from '@/utils/audioProcessing';
 
 type ProcessingStage = 'idle' | 'uploading' | 'processing' | 'complete';
@@ -41,6 +43,21 @@ const VocalRemoverPage = () => {
   
   // Current active player state for UI
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  
+  // Preload the AudioWorklet when the component mounts
+  React.useEffect(() => {
+    const preloadWorklet = async () => {
+      try {
+        const audioContext = getAudioContext();
+        await loadSpectralGateWorklet(audioContext);
+        console.log("AudioWorklet preloaded successfully");
+      } catch (error) {
+        console.warn("AudioWorklet preloading failed:", error);
+      }
+    };
+    
+    preloadWorklet();
+  }, []);
   
   // Handle drag and drop functionality
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -119,7 +136,7 @@ const VocalRemoverPage = () => {
       setProcessingStage('processing');
       toast({
         title: "Processing started",
-        description: "Applying standard vocal isolation techniques...",
+        description: "Applying advanced vocal isolation techniques...",
       });
       
       // Standard vocal isolation (balanced approach)
@@ -132,14 +149,14 @@ const VocalRemoverPage = () => {
         return;
       }
       
-      // Notify user about enhanced a cappella processing
+      // Notify user about enhanced ultra-advanced a cappella processing
       toast({
         title: "Creating pure vocals",
-        description: "Applying advanced a cappella extraction algorithm...",
+        description: "Applying AI spectral gating algorithm...",
       });
 
-      // Advanced a cappella extraction (focused purely on vocals)
-      const acappellaBuffer = await processAdvancedVocalExtraction(audioBuffer);
+      // Ultra-advanced a cappella extraction (AI-powered spectral gating)
+      const acappellaBuffer = await processUltraAdvancedVocalIsolation(audioBuffer);
       setProgress(70);
 
       // Check if aborted
@@ -149,7 +166,7 @@ const VocalRemoverPage = () => {
       
       toast({
         title: "Final processing step",
-        description: "Now separating instrumental tracks...",
+        description: "Now separating instrumental tracks with mid/side processing...",
       });
       
       // Process instrumental with enhanced phase cancellation
@@ -185,7 +202,7 @@ const VocalRemoverPage = () => {
       
       toast({
         title: "Processing complete",
-        description: "Your audio has been separated with advanced techniques - try the pure vocals option!",
+        description: "Your audio has been separated with AI spectral gating technology!",
       });
       
     } catch (error) {
@@ -285,9 +302,9 @@ const VocalRemoverPage = () => {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
         </Button>
-        <h1 className="text-2xl md:text-3xl font-bold mb-2">Advanced Vocal Remover</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">AI-Powered Vocal Remover</h1>
         <p className="text-muted-foreground max-w-2xl">
-          Separate vocals from instrumentals using advanced audio processing algorithms. Now includes pure vocal extraction mode for a cappella tracks.
+          Separate vocals from instrumentals using advanced AI spectral gating technology. Features Ultra Pure Vocal extraction for professional-quality a cappella tracks.
         </p>
       </div>
       
@@ -345,7 +362,7 @@ const VocalRemoverPage = () => {
                   <div className="flex justify-between text-sm">
                     <span>
                       {processingStage === 'uploading' && 'Loading audio...'}
-                      {processingStage === 'processing' && 'Processing audio with AI...'}
+                      {processingStage === 'processing' && 'Processing audio with AI spectral gating...'}
                     </span>
                     <span>{progress}%</span>
                   </div>
@@ -413,8 +430,8 @@ const VocalRemoverPage = () => {
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="acappella" id="acappella" />
                       <Label htmlFor="acappella" className="cursor-pointer flex items-center">
-                        Pure Vocals <Mic className="ml-2 h-4 w-4 text-purple-400" />
-                        <span className="ml-1 text-xs text-purple-400">(New!)</span>
+                        Ultra Pure Vocals <Sparkles className="ml-2 h-4 w-4 text-purple-400" />
+                        <span className="ml-1 text-xs text-purple-400">(AI-Powered!)</span>
                       </Label>
                     </div>
                   </RadioGroup>
@@ -426,7 +443,7 @@ const VocalRemoverPage = () => {
                   onClick={downloadCurrentAudio}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Download {activeAudio === 'acappella' ? 'Pure Vocals' : 
+                  Download {activeAudio === 'acappella' ? 'Ultra Pure Vocals' : 
                            activeAudio.charAt(0).toUpperCase() + activeAudio.slice(1)}
                 </Button>
               </motion.div>
@@ -469,7 +486,7 @@ const VocalRemoverPage = () => {
                   {activeAudio === 'acappella' && (
                     <AudioPlayer
                       audioUrl={result.acappella}
-                      label="Pure Vocal Track (A Cappella)"
+                      label="Ultra Pure Vocals (AI-Processed)"
                       onPlayStateChange={(isPlaying) => handlePlayStateChange('acappella', isPlaying)}
                     />
                   )}

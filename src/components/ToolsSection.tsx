@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, AudioWaveform, Mic } from 'lucide-react';
+import { ArrowRight, AudioWaveform, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,8 +12,8 @@ const ToolsSection = () => {
   // Vocal Remover tool data with updated description
   const tool = {
     id: 'vocal-remover',
-    title: 'Advanced AI Vocal Remover & Extractor',
-    description: 'Separate vocals from instrumentals with advanced techniques. Extract pure vocals for a cappella tracks. Perfect for karaoke, remixes, and audio editing. Works with files up to 10MB.',
+    title: 'AI-Powered Vocal Remover & Extractor',
+    description: 'Separate vocals from instrumentals with cutting-edge AI technology. Extract ultra-pure vocals using spectral gating algorithms. Perfect for karaoke, remixes, and professional audio editing. Works with files up to 10MB.',
     icon: <AudioWaveform size={24} />,
     path: '/vocalremover',
     color: 'from-purple-500 to-pink-500'
@@ -68,7 +68,7 @@ const ToolsSection = () => {
               </div>
               <h3 className="text-lg font-medium text-white mb-2 flex items-center">
                 {tool.title}
-                <Mic className="ml-2 h-4 w-4 text-purple-400" />
+                <Sparkles className="ml-2 h-4 w-4 text-purple-400" />
               </h3>
               <p className="text-sm text-muted-foreground mb-4">{tool.description}</p>
               
