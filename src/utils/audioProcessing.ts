@@ -1,3 +1,4 @@
+
 /**
  * Advanced audio processing utility for vocal separation
  */
@@ -14,7 +15,8 @@ export const getAudioContext = (): AudioContext => {
 };
 
 // Function to load the spectral gate AudioWorklet module
-export const loadSpectralGateWorklet = async (audioContext: AudioContext) => {
+// Updated to accept either AudioContext or OfflineAudioContext
+export const loadSpectralGateWorklet = async (audioContext: BaseAudioContext) => {
   try {
     await audioContext.audioWorklet.addModule('spectral-gate-processor.js');
     return true;
@@ -403,6 +405,7 @@ export const processUltraAdvancedVocalIsolation = async (audioBuffer: AudioBuffe
   const audioContext = new OfflineAudioContext(2, length, sampleRate);
 
   // Try to load the spectral gate AudioWorklet
+  // Modified to use the updated loadSpectralGateWorklet function that accepts BaseAudioContext
   let workletLoaded = false;
   try {
     workletLoaded = await loadSpectralGateWorklet(audioContext);
