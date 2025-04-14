@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Headphones, ArrowLeft, Upload, X, Download, AudioWaveform as WaveformIcon } from 'lucide-react';
+import { Headphones, ArrowLeft, Upload, X, Download, AudioWaveform as WaveformIcon, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -13,6 +13,7 @@ import {
   loadAudioFromFile, 
   processVocalIsolation,
   processAdvancedInstrumentalExtraction,
+  processAdvancedVocalExtraction,
   audioBufferToWav
 } from '@/utils/audioProcessing';
 
@@ -21,6 +22,7 @@ type ProcessingStage = 'idle' | 'uploading' | 'processing' | 'complete';
 interface AudioResult {
   instrumental: string;
   vocals: string;
+  acappella: string;
   original: string;
 }
 
@@ -31,7 +33,7 @@ const VocalRemoverPage = () => {
   const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AudioResult | null>(null);
-  const [activeAudio, setActiveAudio] = useState<'original' | 'instrumental' | 'vocals'>('original');
+  const [activeAudio, setActiveAudio] = useState<'original' | 'instrumental' | 'vocals' | 'acappella'>('original');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -107,36 +109,52 @@ const VocalRemoverPage = () => {
       
       // Read file as AudioBuffer
       const originalUrl = URL.createObjectURL(audioFile);
-      setProgress(20);
+      setProgress(15);
       
       // Decode audio data
       const audioBuffer = await loadAudioFromFile(audioFile);
-      setProgress(30);
+      setProgress(25);
       
       // Move to processing stage with detailed progress updates
       setProcessingStage('processing');
       toast({
         title: "Processing started",
-        description: "Applying advanced vocal isolation techniques...",
+        description: "Applying standard vocal isolation techniques...",
       });
       
-      // Process vocals with enhanced algorithm
-      setProgress(40);
+      // Standard vocal isolation (balanced approach)
+      setProgress(35);
       const vocalBuffer = await processVocalIsolation(audioBuffer);
-      setProgress(60);
-      toast({
-        title: "Vocal Isolation Complete",
-        description: "Now separating instrumental tracks...",
-      });
-      
+      setProgress(50);
+
       // Check if aborted
       if (abortControllerRef.current?.signal.aborted) {
         return;
       }
       
+      // Notify user about enhanced a cappella processing
+      toast({
+        title: "Creating pure vocals",
+        description: "Applying advanced a cappella extraction algorithm...",
+      });
+
+      // Advanced a cappella extraction (focused purely on vocals)
+      const acappellaBuffer = await processAdvancedVocalExtraction(audioBuffer);
+      setProgress(70);
+
+      // Check if aborted
+      if (abortControllerRef.current?.signal.aborted) {
+        return;
+      }
+      
+      toast({
+        title: "Final processing step",
+        description: "Now separating instrumental tracks...",
+      });
+      
       // Process instrumental with enhanced phase cancellation
       const instrumentalBuffer = await processAdvancedInstrumentalExtraction(audioBuffer);
-      setProgress(80);
+      setProgress(85);
       
       // Check if aborted
       if (abortControllerRef.current?.signal.aborted) {
@@ -145,17 +163,20 @@ const VocalRemoverPage = () => {
       
       // Convert AudioBuffers to WAV blobs
       const vocalBlob = audioBufferToWav(vocalBuffer);
+      const acappellaBlob = audioBufferToWav(acappellaBuffer);
       const instrumentalBlob = audioBufferToWav(instrumentalBuffer);
       
       // Create object URLs for the audio elements
       const vocalsUrl = URL.createObjectURL(vocalBlob);
+      const acappellaUrl = URL.createObjectURL(acappellaBlob);
       const instrumentalUrl = URL.createObjectURL(instrumentalBlob);
       
       // Set result
       setResult({
         original: originalUrl,
         instrumental: instrumentalUrl,
-        vocals: vocalsUrl
+        vocals: vocalsUrl,
+        acappella: acappellaUrl
       });
       
       // Complete processing
@@ -164,7 +185,7 @@ const VocalRemoverPage = () => {
       
       toast({
         title: "Processing complete",
-        description: "Your audio has been separated with advanced techniques!",
+        description: "Your audio has been separated with advanced techniques - try the pure vocals option!",
       });
       
     } catch (error) {
@@ -197,6 +218,10 @@ const VocalRemoverPage = () => {
       case 'vocals':
         url = result.vocals;
         filename = file ? `${file.name.split('.')[0]}_vocals.wav` : 'vocals.wav';
+        break;
+      case 'acappella':
+        url = result.acappella;
+        filename = file ? `${file.name.split('.')[0]}_acappella.wav` : 'acappella.wav';
         break;
       default:
         url = result.original;
@@ -262,7 +287,7 @@ const VocalRemoverPage = () => {
         </Button>
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Advanced Vocal Remover</h1>
         <p className="text-muted-foreground max-w-2xl">
-          Separate vocals from instrumentals using advanced phase cancellation and spectral filtering. Works best with stereo audio files under 10MB.
+          Separate vocals from instrumentals using advanced audio processing algorithms. Now includes pure vocal extraction mode for a cappella tracks.
         </p>
       </div>
       
@@ -356,6 +381,7 @@ const VocalRemoverPage = () => {
                         URL.revokeObjectURL(result.original);
                         URL.revokeObjectURL(result.instrumental);
                         URL.revokeObjectURL(result.vocals);
+                        URL.revokeObjectURL(result.acappella);
                       }
                     }}
                   >
@@ -367,7 +393,7 @@ const VocalRemoverPage = () => {
                   <RadioGroup 
                     value={activeAudio}
                     onValueChange={(value: any) => {
-                      setActiveAudio(value as 'original' | 'instrumental' | 'vocals');
+                      setActiveAudio(value as 'original' | 'instrumental' | 'vocals' | 'acappella');
                       setCurrentlyPlaying(null); // Stop playing when switching tracks
                     }}
                     className="space-y-2"
@@ -382,7 +408,14 @@ const VocalRemoverPage = () => {
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="vocals" id="vocals" />
-                      <Label htmlFor="vocals" className="cursor-pointer">Vocals Only</Label>
+                      <Label htmlFor="vocals" className="cursor-pointer">Standard Vocals</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="acappella" id="acappella" />
+                      <Label htmlFor="acappella" className="cursor-pointer flex items-center">
+                        Pure Vocals <Mic className="ml-2 h-4 w-4 text-purple-400" />
+                        <span className="ml-1 text-xs text-purple-400">(New!)</span>
+                      </Label>
                     </div>
                   </RadioGroup>
                 </div>
@@ -393,7 +426,8 @@ const VocalRemoverPage = () => {
                   onClick={downloadCurrentAudio}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Download {activeAudio.charAt(0).toUpperCase() + activeAudio.slice(1)}
+                  Download {activeAudio === 'acappella' ? 'Pure Vocals' : 
+                           activeAudio.charAt(0).toUpperCase() + activeAudio.slice(1)}
                 </Button>
               </motion.div>
             )}
@@ -427,8 +461,16 @@ const VocalRemoverPage = () => {
                   {activeAudio === 'vocals' && (
                     <AudioPlayer
                       audioUrl={result.vocals}
-                      label="Vocals Track"
+                      label="Standard Vocal Track"
                       onPlayStateChange={(isPlaying) => handlePlayStateChange('vocals', isPlaying)}
+                    />
+                  )}
+                  
+                  {activeAudio === 'acappella' && (
+                    <AudioPlayer
+                      audioUrl={result.acappella}
+                      label="Pure Vocal Track (A Cappella)"
+                      onPlayStateChange={(isPlaying) => handlePlayStateChange('acappella', isPlaying)}
                     />
                   )}
                 </div>
