@@ -51,6 +51,16 @@ const StreamPlayer = () => {
           setError("No streaming sources available");
         } else {
           setStreamSources(sources);
+          
+          // Check if StreamVid source is available
+          const hasStreamVid = sources.some(source => source.provider === 'StreamVid');
+          if (hasStreamVid) {
+            toast({
+              title: "Premium stream available",
+              description: "StreamVid source detected for high quality playback",
+              variant: "default"
+            });
+          }
         }
       } catch (err) {
         console.error("Error loading content:", err);

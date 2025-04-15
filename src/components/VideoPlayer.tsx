@@ -14,11 +14,14 @@ interface VideoPlayerProps {
 
 const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [currentSource, setCurrentSource] = useState<Source>(
-    // Default to Direct provider if available, otherwise use the first source
-    sources.find(s => s.provider === 'Direct') || sources[0]
+    // Default to StreamVid provider if available, otherwise use the first source
+    sources.find(s => s.provider === 'StreamVid') || 
+    sources.find(s => s.provider === 'Direct') || 
+    sources[0]
   );
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [isMuted, setIsMuted] = useState(false);
@@ -29,8 +32,15 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
   const [isLoading, setIsLoading] = useState(true);
   
   const controlsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isStreamVid = currentSource.provider === 'StreamVid';
 
   useEffect(() => {
+    if (isStreamVid) {
+      // For StreamVid sources, we don't need to handle video events
+      setIsLoading(false);
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
 
@@ -61,7 +71,7 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
       video.removeEventListener('loadstart', handleLoadStart);
       video.removeEventListener('canplay', handleCanPlay);
     };
-  }, [autoPlay, currentSource.url]);
+  }, [autoPlay, currentSource.url, isStreamVid]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -82,6 +92,12 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
   };
 
   const togglePlay = () => {
+    if (isStreamVid) {
+      // For StreamVid, we can't control play/pause directly
+      // Could implement a postMessage API if StreamVid supports it
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
     
@@ -95,6 +111,11 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
   };
 
   const toggleMute = () => {
+    if (isStreamVid) {
+      // For StreamVid, we can't control mute directly
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
     
@@ -103,6 +124,11 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isStreamVid) {
+      // For StreamVid, we can't control seeking directly
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
     
@@ -131,36 +157,41 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
     }
     
     controlsTimerRef.current = setTimeout(() => {
-      if (isPlaying) {
+      if (isPlaying && !isStreamVid) {
         setControlsVisible(false);
       }
     }, 3000);
   };
 
   const handleSkipForward = () => {
+    if (isStreamVid) return;
     if (!videoRef.current) return;
     videoRef.current.currentTime += 10;
   };
 
   const handleSkipBackward = () => {
+    if (isStreamVid) return;
     if (!videoRef.current) return;
     videoRef.current.currentTime -= 10;
   };
 
   const handleSourceChange = (source: Source) => {
-    setCurrentSource(source);
-    // Save current playback position
-    const currentPosition = videoRef.current?.currentTime || 0;
+    // Save current playback position if not switching to/from StreamVid
+    const currentPosition = !isStreamVid && videoRef.current ? videoRef.current.currentTime : 0;
     
-    // After source change, try to restore position
-    setTimeout(() => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = currentPosition;
-        if (isPlaying) {
-          videoRef.current.play().catch(e => console.error("Play error after source change:", e));
+    setCurrentSource(source);
+    
+    // After source change, try to restore position (only for regular video sources)
+    if (source.provider !== 'StreamVid') {
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.currentTime = currentPosition;
+          if (isPlaying) {
+            videoRef.current.play().catch(e => console.error("Play error after source change:", e));
+          }
         }
-      }
-    }, 100);
+      }, 100);
+    }
   };
 
   return (
@@ -168,18 +199,29 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
       ref={containerRef}
       className="relative w-full h-full bg-black rounded-lg overflow-hidden"
       onMouseMove={handleMouseMove}
-      onClick={() => controlsVisible ? togglePlay() : setControlsVisible(true)}
+      onClick={() => !isStreamVid && (controlsVisible ? togglePlay() : setControlsVisible(true))}
     >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        src={currentSource.url}
-        className="w-full h-full"
-        playsInline
-      />
+      {/* StreamVid Player (iframe) */}
+      {isStreamVid ? (
+        <iframe
+          ref={iframeRef}
+          src={currentSource.url}
+          className="w-full h-full border-0"
+          allowFullScreen
+          allow="autoplay; encrypted-media; picture-in-picture"
+        ></iframe>
+      ) : (
+        /* Regular Video Element */
+        <video
+          ref={videoRef}
+          src={currentSource.url}
+          className="w-full h-full"
+          playsInline
+        />
+      )}
       
-      {/* Loading Spinner */}
-      {isLoading && (
+      {/* Loading Spinner (only for non-StreamVid) */}
+      {isLoading && !isStreamVid && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/30">
           <div className="w-12 h-12 border-4 border-t-transparent border-white rounded-full animate-spin"></div>
         </div>
@@ -203,64 +245,91 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
         </div>
       )}
       
-      {/* Video controls */}
+      {/* Video controls (only show full controls for non-StreamVid sources) */}
       <div className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        {/* Progress bar */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-white text-sm">{formatTime(currentTime)}</span>
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            value={currentTime}
-            onChange={handleSeek}
-            className="w-full h-1 rounded-full bg-gray-600 appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <span className="text-white text-sm">{formatTime(duration)}</span>
-        </div>
+        {!isStreamVid && (
+          <>
+            {/* Progress bar */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-white text-sm">{formatTime(currentTime)}</span>
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                value={currentTime}
+                onChange={handleSeek}
+                className="w-full h-1 rounded-full bg-gray-600 appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <span className="text-white text-sm">{formatTime(duration)}</span>
+            </div>
+            
+            {/* Control buttons for regular video */}
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-white hover:bg-white/20" 
+                  onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                >
+                  {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-white hover:bg-white/20" 
+                  onClick={(e) => { e.stopPropagation(); handleSkipBackward(); }}
+                >
+                  <SkipBack className="h-5 w-5" />
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-white hover:bg-white/20" 
+                  onClick={(e) => { e.stopPropagation(); handleSkipForward(); }}
+                >
+                  <SkipForward className="h-5 w-5" />
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-white hover:bg-white/20" 
+                  onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+                >
+                  {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-white hover:bg-white/20" 
+                  onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                >
+                  <Maximize className="h-5 w-5" />
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-white hover:bg-white/20" 
+                  onClick={(e) => { e.stopPropagation(); }}
+                >
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
         
-        {/* Control buttons */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white hover:bg-white/20" 
-              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-            >
-              {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white hover:bg-white/20" 
-              onClick={(e) => { e.stopPropagation(); handleSkipBackward(); }}
-            >
-              <SkipBack className="h-5 w-5" />
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white hover:bg-white/20" 
-              onClick={(e) => { e.stopPropagation(); handleSkipForward(); }}
-            >
-              <SkipForward className="h-5 w-5" />
-            </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white hover:bg-white/20" 
-              onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-            >
-              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-2">
+        {/* For StreamVid, only show the fullscreen button */}
+        {isStreamVid && (
+          <div className="flex justify-end">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -269,17 +338,8 @@ const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerPr
             >
               <Maximize className="h-5 w-5" />
             </Button>
-            
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white hover:bg-white/20" 
-              onClick={(e) => { e.stopPropagation(); }}
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

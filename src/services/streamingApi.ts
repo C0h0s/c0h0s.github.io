@@ -1,4 +1,3 @@
-
 interface Source {
   id: string;
   name: string;
@@ -21,6 +20,7 @@ interface Movie {
   category: string;
   featured?: boolean;
   sources: Source[];
+  streamvid_id?: string;
 }
 
 interface TvShow {
@@ -35,6 +35,7 @@ interface TvShow {
   category: string;
   featured?: boolean;
   episodes: Episode[];
+  streamvid_id?: string;
 }
 
 interface Episode {
@@ -45,13 +46,15 @@ interface Episode {
   episode: number;
   duration: string;
   sources: Source[];
+  streamvid_id?: string;
 }
 
 type Content = Movie | TvShow;
 
-// Mock API endpoints to simulate a real streaming service
+const STREAMVID_API_KEY = "YOUR_STREAMVID_API_KEY";
+const STREAMVID_API_BASE = "https://api.streamvid.co/v1";
+
 const fetchFeaturedContent = async (): Promise<Content> => {
-  // This would be an actual API call in a real app
   return {
     id: "tt9362722",
     title: "Spider-Man: Across the Spider-Verse",
@@ -63,12 +66,32 @@ const fetchFeaturedContent = async (): Promise<Content> => {
     description: "Miles Morales returns for the next chapter of the Spider-Verse saga, spanning worlds and bringing a team of Spider-People to face a new threat.",
     category: "Animation",
     featured: true,
-    sources: generateMockSources("tt9362722")
+    sources: await generateSourcesWithStreamVid("tt9362722", "sv_1234567"),
+    streamvid_id: "sv_1234567"
   };
 };
 
-const generateMockSources = (contentId: string): Source[] => {
-  return [
+const fetchStreamVidSources = async (streamvid_id: string): Promise<Source | null> => {
+  if (!streamvid_id) return null;
+  
+  try {
+    return {
+      id: `sv-${streamvid_id}`,
+      name: "StreamVid",
+      quality: "1080p",
+      provider: "StreamVid",
+      url: `https://streamvid.co/player/${streamvid_id}`
+    };
+  } catch (error) {
+    console.error("Error fetching StreamVid source:", error);
+    return null;
+  }
+};
+
+const generateMockSources = async (contentId: string, streamvid_id?: string): Promise<Source[]> => {
+  const streamVidSource = streamvid_id ? await fetchStreamVidSources(streamvid_id) : null;
+  
+  const sources: Source[] = [
     {
       id: `${contentId}-vg`,
       name: "Server 1",
@@ -98,25 +121,26 @@ const generateMockSources = (contentId: string): Source[] => {
       url: "https://example.com/stream/streamhub-source"
     },
     {
-      id: `${contentId}-sv`,
-      name: "Server 5",
-      quality: "720p",
-      provider: "StreamVid",
-      url: "https://example.com/stream/streamvid-source"
-    },
-    {
       id: `${contentId}-direct`,
       name: "Direct Play",
       quality: "1080p",
       provider: "Direct",
-      // Using a real sample video for demonstration purposes
       url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
     }
   ];
+  
+  if (streamVidSource) {
+    sources.unshift(streamVidSource);
+  }
+  
+  return sources;
+};
+
+const generateSourcesWithStreamVid = async (contentId: string, streamvid_id?: string): Promise<Source[]> => {
+  return await generateMockSources(contentId, streamvid_id);
 };
 
 const fetchContentByCategory = async (category: string): Promise<Content[]> => {
-  // This would be an actual API call in a real app
   const mockContent: Content[] = [
     {
       id: "tt9362722",
@@ -128,7 +152,8 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 20m",
       description: "Miles Morales returns for the next chapter of the Spider-Verse saga.",
       category: "Animation",
-      sources: generateMockSources("tt9362722")
+      sources: await generateSourcesWithStreamVid("tt9362722", "sv_1234567"),
+      streamvid_id: "sv_1234567"
     },
     {
       id: "tt6751668",
@@ -140,7 +165,8 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 12m",
       description: "All unemployed, Ki-taek and his family take peculiar interest in the wealthy Park family.",
       category: "Thriller",
-      sources: generateMockSources("tt6751668")
+      sources: await generateSourcesWithStreamVid("tt6751668", "sv_7654321"),
+      streamvid_id: "sv_7654321"
     },
     {
       id: "tt1375666",
@@ -152,7 +178,8 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 28m",
       description: "A thief who steals corporate secrets through the use of dream-sharing technology.",
       category: "Sci-Fi",
-      sources: generateMockSources("tt1375666")
+      sources: await generateSourcesWithStreamVid("tt1375666", "sv_8765432"),
+      streamvid_id: "sv_8765432"
     },
     {
       id: "tt0111161",
@@ -164,7 +191,8 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 22m",
       description: "Two imprisoned men bond over a number of years, finding solace and eventual redemption.",
       category: "Drama",
-      sources: generateMockSources("tt0111161")
+      sources: await generateSourcesWithStreamVid("tt0111161", "sv_3456789"),
+      streamvid_id: "sv_3456789"
     },
     {
       id: "tt0468569",
@@ -176,7 +204,8 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 32m",
       description: "Batman raises the stakes in his war on crime.",
       category: "Action",
-      sources: generateMockSources("tt0468569")
+      sources: await generateSourcesWithStreamVid("tt0468569", "sv_9876543"),
+      streamvid_id: "sv_9876543"
     },
     {
       id: "tt0109830",
@@ -188,11 +217,11 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 22m",
       description: "The presidencies of Kennedy and Johnson, the Vietnam War, and other events unfold through the perspective of an Alabama man.",
       category: "Drama",
-      sources: generateMockSources("tt0109830")
+      sources: await generateSourcesWithStreamVid("tt0109830", "sv_6543210"),
+      streamvid_id: "sv_6543210"
     }
   ];
 
-  // Filter by category if provided, otherwise return all
   if (category !== "all" && category !== "featured") {
     return mockContent.filter(item => 
       item.category.toLowerCase() === category.toLowerCase()
@@ -221,7 +250,6 @@ const getContentDetails = async (id: string): Promise<Content | null> => {
   return allContent.find(item => item.id === id) || null;
 };
 
-// Function to get content stream sources
 const getStreamSources = async (contentId: string): Promise<Source[]> => {
   const content = await getContentDetails(contentId);
   if (!content) {
@@ -229,10 +257,16 @@ const getStreamSources = async (contentId: string): Promise<Source[]> => {
   }
   
   if ('sources' in content) {
+    if (content.streamvid_id) {
+      return await generateSourcesWithStreamVid(contentId, content.streamvid_id);
+    }
     return content.sources;
   } else if ('episodes' in content && content.episodes.length > 0) {
-    // Return sources of the first episode for TV shows
-    return content.episodes[0].sources;
+    const firstEpisode = content.episodes[0];
+    if (firstEpisode.streamvid_id) {
+      return await generateSourcesWithStreamVid(contentId, firstEpisode.streamvid_id);
+    }
+    return firstEpisode.sources;
   }
   
   throw new Error("No streaming sources available");
