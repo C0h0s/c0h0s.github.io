@@ -2,23 +2,32 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Volume2, VolumeX, Maximize, Pause, Play, Settings, SkipBack, SkipForward } from 'lucide-react';
+import { type Source } from '@/services/streamingApi';
+import SourceSelector from './SourceSelector';
 
 interface VideoPlayerProps {
-  src: string;
+  sources: Source[];
   title: string;
   autoPlay?: boolean;
   onClose?: () => void;
 }
 
-const VideoPlayer = ({ src, title, autoPlay = true, onClose }: VideoPlayerProps) => {
+const VideoPlayer = ({ sources, title, autoPlay = true, onClose }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  const [currentSource, setCurrentSource] = useState<Source>(
+    // Default to Direct provider if available, otherwise use the first source
+    sources.find(s => s.provider === 'Direct') || sources[0]
+  );
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const controlsTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -26,10 +35,17 @@ const VideoPlayer = ({ src, title, autoPlay = true, onClose }: VideoPlayerProps)
     if (!video) return;
 
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
-    const handleLoadedMetadata = () => setDuration(video.duration);
+    const handleLoadedMetadata = () => {
+      setDuration(video.duration);
+      setIsLoading(false);
+    };
+    const handleLoadStart = () => setIsLoading(true);
+    const handleCanPlay = () => setIsLoading(false);
     
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('loadstart', handleLoadStart);
+    video.addEventListener('canplay', handleCanPlay);
     
     if (autoPlay) {
       try {
@@ -42,8 +58,10 @@ const VideoPlayer = ({ src, title, autoPlay = true, onClose }: VideoPlayerProps)
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('loadstart', handleLoadStart);
+      video.removeEventListener('canplay', handleCanPlay);
     };
-  }, [autoPlay]);
+  }, [autoPlay, currentSource.url]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -129,6 +147,22 @@ const VideoPlayer = ({ src, title, autoPlay = true, onClose }: VideoPlayerProps)
     videoRef.current.currentTime -= 10;
   };
 
+  const handleSourceChange = (source: Source) => {
+    setCurrentSource(source);
+    // Save current playback position
+    const currentPosition = videoRef.current?.currentTime || 0;
+    
+    // After source change, try to restore position
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = currentPosition;
+        if (isPlaying) {
+          videoRef.current.play().catch(e => console.error("Play error after source change:", e));
+        }
+      }
+    }, 100);
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -136,17 +170,36 @@ const VideoPlayer = ({ src, title, autoPlay = true, onClose }: VideoPlayerProps)
       onMouseMove={handleMouseMove}
       onClick={() => controlsVisible ? togglePlay() : setControlsVisible(true)}
     >
+      {/* Video Element */}
       <video
         ref={videoRef}
-        src={src}
+        src={currentSource.url}
         className="w-full h-full"
         playsInline
       />
       
+      {/* Loading Spinner */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+          <div className="w-12 h-12 border-4 border-t-transparent border-white rounded-full animate-spin"></div>
+        </div>
+      )}
+      
       {/* Title overlay (shows briefly) */}
       {controlsVisible && (
         <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent">
-          <h3 className="text-white font-medium text-lg">{title}</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-white font-medium text-lg">{title}</h3>
+            
+            {/* Source Selector */}
+            <div onClick={(e) => e.stopPropagation()}>
+              <SourceSelector 
+                sources={sources}
+                currentSource={currentSource}
+                onSelectSource={handleSourceChange}
+              />
+            </div>
+          </div>
         </div>
       )}
       

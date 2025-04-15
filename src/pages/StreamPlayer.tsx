@@ -3,16 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import VideoPlayer from '@/components/VideoPlayer';
-import { getContentDetails, getStreamUrl, type Content } from '@/services/streamingApi';
+import { getContentDetails, getStreamSources, type Content, type Source } from '@/services/streamingApi';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/use-toast';
 
 const StreamPlayer = () => {
   const { contentId } = useParams<{ contentId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [content, setContent] = useState<Content | null>(null);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [streamSources, setStreamSources] = useState<Source[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,9 +39,19 @@ const StreamPlayer = () => {
         
         setContent(contentDetails);
         
-        // Get the streaming URL
-        const url = await getStreamUrl(contentId);
-        setStreamUrl(url);
+        // Get the streaming sources
+        const sources = await getStreamSources(contentId);
+        
+        if (sources.length === 0) {
+          toast({
+            title: "No streaming sources available",
+            description: "Try another title or check back later",
+            variant: "destructive"
+          });
+          setError("No streaming sources available");
+        } else {
+          setStreamSources(sources);
+        }
       } catch (err) {
         console.error("Error loading content:", err);
         setError("Failed to load content");
@@ -49,7 +61,7 @@ const StreamPlayer = () => {
     };
 
     fetchContent();
-  }, [contentId]);
+  }, [contentId, toast]);
 
   const goBack = () => {
     navigate('/streaming');
@@ -94,9 +106,9 @@ const StreamPlayer = () => {
       
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-2">
         <div className="w-full max-w-6xl aspect-video">
-          {streamUrl ? (
+          {streamSources.length > 0 ? (
             <VideoPlayer 
-              src={streamUrl}
+              sources={streamSources}
               title={content.title}
               autoPlay={true}
             />

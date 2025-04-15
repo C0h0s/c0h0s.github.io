@@ -21,15 +21,14 @@ const StreamingSection = () => {
     >
       <div className="container mx-auto max-w-5xl relative z-10">
         <div className="flex flex-col md:flex-row items-center gap-8">
-          <div className="flex-1 text-left">
+          <div className="flex-1">
             <h2 className="text-3xl font-bold text-white mb-2">c0h0s Streaming</h2>
-            <p className="text-gray-400 mb-6">Stream movies & TV shows instantly. No sign-up required.</p>
             <Button 
               onClick={handleNavigate}
               className="bg-gaming-purple hover:bg-gaming-purple/90 text-white"
             >
               <Play className="mr-2 h-4 w-4" />
-              Start Watching
+              Stream Now
             </Button>
           </div>
           

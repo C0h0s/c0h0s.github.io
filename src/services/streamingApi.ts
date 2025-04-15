@@ -1,4 +1,14 @@
 
+interface Source {
+  id: string;
+  name: string;
+  quality: string;
+  url: string;
+  provider: StreamProvider;
+}
+
+type StreamProvider = 'VidGuard' | 'MixDrop' | 'VidPlay' | 'StreamHub' | 'StreamVid' | 'Direct';
+
 interface Movie {
   id: string;
   title: string;
@@ -10,7 +20,7 @@ interface Movie {
   description: string;
   category: string;
   featured?: boolean;
-  videoUrl: string;
+  sources: Source[];
 }
 
 interface TvShow {
@@ -34,7 +44,7 @@ interface Episode {
   season: number;
   episode: number;
   duration: string;
-  videoUrl: string;
+  sources: Source[];
 }
 
 type Content = Movie | TvShow;
@@ -53,8 +63,56 @@ const fetchFeaturedContent = async (): Promise<Content> => {
     description: "Miles Morales returns for the next chapter of the Spider-Verse saga, spanning worlds and bringing a team of Spider-People to face a new threat.",
     category: "Animation",
     featured: true,
-    videoUrl: "https://example.com/stream/spiderman-spiderverse"
+    sources: generateMockSources("tt9362722")
   };
+};
+
+const generateMockSources = (contentId: string): Source[] => {
+  return [
+    {
+      id: `${contentId}-vg`,
+      name: "Server 1",
+      quality: "1080p",
+      provider: "VidGuard",
+      url: "https://example.com/stream/vidguard-source"
+    },
+    {
+      id: `${contentId}-md`,
+      name: "Server 2",
+      quality: "720p",
+      provider: "MixDrop",
+      url: "https://example.com/stream/mixdrop-source"
+    },
+    {
+      id: `${contentId}-vp`,
+      name: "Server 3",
+      quality: "1080p",
+      provider: "VidPlay",
+      url: "https://example.com/stream/vidplay-source"
+    },
+    {
+      id: `${contentId}-sh`,
+      name: "Server 4",
+      quality: "4K",
+      provider: "StreamHub",
+      url: "https://example.com/stream/streamhub-source"
+    },
+    {
+      id: `${contentId}-sv`,
+      name: "Server 5",
+      quality: "720p",
+      provider: "StreamVid",
+      url: "https://example.com/stream/streamvid-source"
+    },
+    {
+      id: `${contentId}-direct`,
+      name: "Direct Play",
+      quality: "1080p",
+      provider: "Direct",
+      // Using a real sample video for demonstration purposes
+      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    }
+  ];
 };
 
 const fetchContentByCategory = async (category: string): Promise<Content[]> => {
@@ -70,7 +128,7 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 20m",
       description: "Miles Morales returns for the next chapter of the Spider-Verse saga.",
       category: "Animation",
-      videoUrl: "https://example.com/stream/spiderman-spiderverse"
+      sources: generateMockSources("tt9362722")
     },
     {
       id: "tt6751668",
@@ -82,7 +140,7 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 12m",
       description: "All unemployed, Ki-taek and his family take peculiar interest in the wealthy Park family.",
       category: "Thriller",
-      videoUrl: "https://example.com/stream/parasite"
+      sources: generateMockSources("tt6751668")
     },
     {
       id: "tt1375666",
@@ -94,7 +152,7 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 28m",
       description: "A thief who steals corporate secrets through the use of dream-sharing technology.",
       category: "Sci-Fi",
-      videoUrl: "https://example.com/stream/inception"
+      sources: generateMockSources("tt1375666")
     },
     {
       id: "tt0111161",
@@ -106,7 +164,7 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 22m",
       description: "Two imprisoned men bond over a number of years, finding solace and eventual redemption.",
       category: "Drama",
-      videoUrl: "https://example.com/stream/shawshank-redemption"
+      sources: generateMockSources("tt0111161")
     },
     {
       id: "tt0468569",
@@ -118,7 +176,7 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 32m",
       description: "Batman raises the stakes in his war on crime.",
       category: "Action",
-      videoUrl: "https://example.com/stream/dark-knight"
+      sources: generateMockSources("tt0468569")
     },
     {
       id: "tt0109830",
@@ -130,7 +188,7 @@ const fetchContentByCategory = async (category: string): Promise<Content[]> => {
       duration: "2h 22m",
       description: "The presidencies of Kennedy and Johnson, the Vietnam War, and other events unfold through the perspective of an Alabama man.",
       category: "Drama",
-      videoUrl: "https://example.com/stream/forrest-gump"
+      sources: generateMockSources("tt0109830")
     }
   ];
 
@@ -163,14 +221,21 @@ const getContentDetails = async (id: string): Promise<Content | null> => {
   return allContent.find(item => item.id === id) || null;
 };
 
-// Function to get content stream URL (in a real app, this would validate user session, etc.)
-const getStreamUrl = async (contentId: string): Promise<string> => {
+// Function to get content stream sources
+const getStreamSources = async (contentId: string): Promise<Source[]> => {
   const content = await getContentDetails(contentId);
-  if (!content || !('videoUrl' in content)) {
-    throw new Error("Stream not found");
+  if (!content) {
+    throw new Error("Content not found");
   }
   
-  return content.videoUrl;
+  if ('sources' in content) {
+    return content.sources;
+  } else if ('episodes' in content && content.episodes.length > 0) {
+    // Return sources of the first episode for TV shows
+    return content.episodes[0].sources;
+  }
+  
+  throw new Error("No streaming sources available");
 };
 
 export {
@@ -178,9 +243,11 @@ export {
   fetchContentByCategory,
   searchContent,
   getContentDetails,
-  getStreamUrl,
+  getStreamSources,
   type Movie,
   type TvShow,
   type Content,
-  type Episode
+  type Episode,
+  type Source,
+  type StreamProvider
 };
