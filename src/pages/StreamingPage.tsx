@@ -1,105 +1,46 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
-import { Search, Play, Plus, Info, Film, Tv, Star, TrendingUp, Clock, Heart } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from '@/components/ui/navigation-menu';
+import { Search, Play, Plus, Info } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { 
+  fetchFeaturedContent, 
+  fetchContentByCategory, 
+  searchContent,
+  type Content 
+} from '@/services/streamingApi';
 
-// Demo content categories
+// Content categories
 const categories = [
-  { id: 'featured', name: 'Featured' },
   { id: 'trending', name: 'Trending Now' },
   { id: 'new', name: 'New Releases' },
   { id: 'action', name: 'Action' },
+  { id: 'drama', name: 'Drama' },
   { id: 'comedy', name: 'Comedy' },
-  { id: 'horror', name: 'Horror' },
-];
-
-// Demo content items
-const contentItems = [
-  {
-    id: 1,
-    title: "The Lost Kingdom",
-    image: "https://images.unsplash.com/photo-1500673922987-e212871fec22",
-    category: "Action",
-    featured: true,
-    description: "A kingdom in ruins, a hero must rise to save what remains of civilization.",
-    year: 2023,
-    duration: "2h 15m",
-    rating: "PG-13"
-  },
-  {
-    id: 2,
-    title: "Ocean's Mystery",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-    category: "Drama",
-    featured: false,
-    description: "An underwater adventure to discover secrets beneath the waves.",
-    year: 2022,
-    duration: "1h 55m",
-    rating: "PG"
-  },
-  {
-    id: 3,
-    title: "City Nights",
-    image: "https://images.unsplash.com/photo-1721322800607-8c38375eef04",
-    category: "Thriller",
-    featured: true,
-    description: "When the city sleeps, danger lurks in the shadows.",
-    year: 2023,
-    duration: "2h 5m",
-    rating: "R"
-  },
-  {
-    id: 4,
-    title: "Beyond Stars",
-    image: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05",
-    category: "Sci-Fi",
-    featured: false,
-    description: "A journey to the edges of the universe and beyond.",
-    year: 2021,
-    duration: "2h 30m",
-    rating: "PG-13"
-  },
-  // Duplicate a few items to fill the rows
-  {
-    id: 5,
-    title: "Urban Chase",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-    category: "Action",
-    featured: false,
-    description: "A high-speed chase through the urban jungle.",
-    year: 2023,
-    duration: "1h 45m",
-    rating: "PG-13"
-  },
-  {
-    id: 6,
-    title: "Silent Echo",
-    image: "https://images.unsplash.com/photo-1500673922987-e212871fec22",
-    category: "Mystery",
-    featured: false,
-    description: "The silence hides secrets that echo through time.",
-    year: 2022,
-    duration: "2h 10m",
-    rating: "PG-13"
-  }
+  { id: 'thriller', name: 'Thriller' },
+  { id: 'animation', name: 'Animation' },
+  { id: 'sci-fi', name: 'Sci-Fi' }
 ];
 
 const StreamingPage = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
+  const [featuredContent, setFeaturedContent] = useState<Content | null>(null);
+  const [categoryContent, setCategoryContent] = useState<{[key: string]: Content[]}>({});
+  const [searchResults, setSearchResults] = useState<Content[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Animation variants for staggered children
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1
+        staggerChildren: 0.05
       }
     }
   };
@@ -109,139 +50,217 @@ const StreamingPage = () => {
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.6, ease: "easeOut" }
+      transition: { duration: 0.4, ease: "easeOut" }
     }
   };
 
-  const featuredContent = contentItems.find(item => item.featured);
+  useEffect(() => {
+    const loadInitialContent = async () => {
+      try {
+        setIsLoading(true);
+        // Load featured content
+        const featured = await fetchFeaturedContent();
+        setFeaturedContent(featured);
+        
+        // Load content for each category
+        const categoryData: {[key: string]: Content[]} = {};
+        
+        const promises = categories.map(async category => {
+          const content = await fetchContentByCategory(category.id);
+          categoryData[category.id] = content;
+        });
+        
+        await Promise.all(promises);
+        setCategoryContent(categoryData);
+      } catch (error) {
+        console.error("Error loading content:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadInitialContent();
+  }, []);
+
+  useEffect(() => {
+    // Debounced search
+    const delaySearch = setTimeout(async () => {
+      if (searchQuery.trim()) {
+        setIsSearching(true);
+        try {
+          const results = await searchContent(searchQuery);
+          setSearchResults(results);
+        } catch (error) {
+          console.error("Search error:", error);
+          setSearchResults([]);
+        }
+      } else {
+        setIsSearching(false);
+        setSearchResults([]);
+      }
+    }, 500);
+    
+    return () => clearTimeout(delaySearch);
+  }, [searchQuery]);
+
+  const handleWatchContent = (contentId: string) => {
+    navigate(`/stream/${contentId}`);
+  };
+
+  const renderContentRow = (title: string, content: Content[]) => {
+    if (!content || content.length === 0) return null;
+    
+    return (
+      <div className="mb-10">
+        <h2 className="text-lg font-medium text-white mb-4">{title}</h2>
+        <motion.div 
+          className="flex gap-3 overflow-x-auto pb-4 no-scrollbar"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {content.map((item) => (
+            <motion.div 
+              key={item.id}
+              variants={itemVariants}
+              className="flex-shrink-0 w-[180px] cursor-pointer group"
+              onClick={() => handleWatchContent(item.id)}
+            >
+              <div className="relative aspect-[2/3] rounded-md overflow-hidden">
+                <img 
+                  src={item.poster} 
+                  alt={item.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center p-3">
+                  <Button size="sm" className="bg-white text-black hover:bg-white/90 w-full">
+                    <Play className="h-3 w-3 mr-1" /> Play
+                  </Button>
+                </div>
+              </div>
+              <h3 className="text-sm font-medium text-white mt-2 truncate">{item.title}</h3>
+              <p className="text-xs text-gray-400">{item.year}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
       
       <main className="pt-16">
-        {/* Hero Banner */}
-        <section className="relative h-[70vh]">
-          <div className="absolute inset-0">
-            <img 
-              src={featuredContent?.image} 
-              alt={featuredContent?.title}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent"></div>
-          </div>
-          
-          <div className="relative container mx-auto flex flex-col justify-end h-full pb-16 px-4">
-            <div className="max-w-lg text-left">
-              <div className="flex items-center gap-2 mb-4">
-                <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                <span className="text-sm font-semibold text-yellow-400">FEATURED</span>
-              </div>
-              <h1 className="text-5xl font-bold mb-4">{featuredContent?.title}</h1>
-              <div className="flex items-center gap-3 text-sm text-gray-300 mb-4">
-                <span>{featuredContent?.year}</span>
-                <span className="w-1 h-1 rounded-full bg-gray-500"></span>
-                <span>{featuredContent?.duration}</span>
-                <span className="w-1 h-1 rounded-full bg-gray-500"></span>
-                <span>{featuredContent?.rating}</span>
-                <span className="w-1 h-1 rounded-full bg-gray-500"></span>
-                <span>{featuredContent?.category}</span>
-              </div>
-              <p className="text-gray-300 mb-8">{featuredContent?.description}</p>
-              
-              <div className="flex gap-4">
-                <Button className="bg-gaming-purple hover:bg-gaming-purple/90 text-white">
-                  <Play className="mr-2 h-5 w-5" /> Play
-                </Button>
-                <Button variant="outline" className="text-white">
-                  <Info className="mr-2 h-5 w-5" /> More Info
-                </Button>
-              </div>
+        {/* Search Bar */}
+        <div className="sticky top-16 z-10 px-4 py-3 bg-black/90 backdrop-blur-sm border-b border-gray-800">
+          <div className="container mx-auto max-w-7xl flex">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input 
+                type="search"
+                placeholder="Search movies & shows..." 
+                className="pl-10 bg-gray-900 border-gray-800 text-white focus-visible:ring-gaming-purple"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
-        </section>
-        
-        {/* Navigation Menu */}
-        <section className="bg-black/90 backdrop-blur-sm sticky top-0 z-10 py-3">
-          <div className="container mx-auto px-4">
-            <NavigationMenu>
-              <NavigationMenuList className="flex gap-8">
-                <NavigationMenuItem>
-                  <NavigationMenuLink href="#" className="text-white hover:text-gaming-purple transition-colors">
-                    <div className="flex items-center">
-                      <Film className="mr-2 h-4 w-4" /> Movies
-                    </div>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink href="#" className="text-white hover:text-gaming-purple transition-colors">
-                    <div className="flex items-center">
-                      <Tv className="mr-2 h-4 w-4" /> TV Shows
-                    </div>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink href="#" className="text-white hover:text-gaming-purple transition-colors">
-                    <div className="flex items-center">
-                      <TrendingUp className="mr-2 h-4 w-4" /> Trending
-                    </div>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink href="#" className="text-white hover:text-gaming-purple transition-colors">
-                    <div className="flex items-center">
-                      <Heart className="mr-2 h-4 w-4" /> Watchlist
-                    </div>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
-        </section>
-        
-        {/* Content Sections */}
-        <section className="py-8 px-4">
-          <div className="container mx-auto">
-            {categories.map((category) => (
-              <div key={category.id} className="mb-12">
-                <h2 className="text-xl font-bold mb-6">{category.name}</h2>
+        </div>
+
+        {isSearching ? (
+          /* Search Results */
+          <section className="px-4 py-6">
+            <div className="container mx-auto max-w-7xl">
+              <h2 className="text-xl font-medium mb-4">Search Results for "{searchQuery}"</h2>
+              {searchResults.length > 0 ? (
                 <motion.div 
                   className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
                   variants={containerVariants}
                   initial="hidden"
                   animate="visible"
                 >
-                  {contentItems.map((item) => (
+                  {searchResults.map((item) => (
                     <motion.div 
-                      key={`${category.id}-${item.id}`}
+                      key={item.id}
                       variants={itemVariants}
-                      className="relative group cursor-pointer"
+                      className="cursor-pointer group"
+                      onClick={() => handleWatchContent(item.id)}
                     >
-                      <div className="aspect-[2/3] rounded-lg overflow-hidden">
+                      <div className="aspect-[2/3] rounded-md overflow-hidden">
                         <img 
-                          src={item.image} 
+                          src={item.poster} 
                           alt={item.title}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          className="w-full h-full object-cover"
                         />
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                        <h3 className="text-sm font-bold">{item.title}</h3>
-                        <div className="flex items-center mt-2 gap-2">
-                          <Button size="sm" className="bg-white hover:bg-white/90 text-black p-1 h-7 w-7 rounded-full">
-                            <Play className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" variant="outline" className="p-1 h-7 w-7 rounded-full">
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
+                      <h3 className="text-sm font-medium mt-2">{item.title}</h3>
+                      <p className="text-xs text-gray-400">{item.year}</p>
                     </motion.div>
                   ))}
                 </motion.div>
+              ) : (
+                <p className="text-gray-400">No results found for "{searchQuery}"</p>
+              )}
+            </div>
+          </section>
+        ) : (
+          /* Regular Content Display */
+          <>
+            {/* Hero Banner */}
+            {featuredContent && (
+              <section className="relative h-[70vh]">
+                <div className="absolute inset-0">
+                  <img 
+                    src={featuredContent.backdrop} 
+                    alt={featuredContent.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent"></div>
+                </div>
+                
+                <div className="relative container mx-auto max-w-7xl flex flex-col justify-end h-full pb-16 px-4">
+                  <div className="max-w-lg text-left">
+                    <h1 className="text-4xl font-bold mb-2">{featuredContent.title}</h1>
+                    <div className="flex items-center gap-2 text-sm text-gray-300 mb-3">
+                      <span>{featuredContent.year}</span>
+                      <span className="w-1 h-1 rounded-full bg-gray-500"></span>
+                      {'duration' in featuredContent && <span>{featuredContent.duration}</span>}
+                      <span className="w-1 h-1 rounded-full bg-gray-500"></span>
+                      <span>{featuredContent.rating}</span>
+                    </div>
+                    <p className="text-gray-300 mb-6 line-clamp-3">{featuredContent.description}</p>
+                    
+                    <div className="flex gap-3">
+                      <Button 
+                        className="bg-white hover:bg-white/90 text-black"
+                        onClick={() => handleWatchContent(featuredContent.id)}
+                      >
+                        <Play className="mr-2 h-4 w-4" /> Play
+                      </Button>
+                      <Button variant="outline" className="text-white border-white">
+                        <Info className="mr-2 h-4 w-4" /> More Info
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+            
+            {/* Content Categories */}
+            <section className="px-4 pb-12">
+              <div className="container mx-auto max-w-7xl">
+                {categories.map((category) => (
+                  renderContentRow(
+                    category.name, 
+                    categoryContent[category.id] || []
+                  )
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          </>
+        )}
       </main>
     </div>
   );
