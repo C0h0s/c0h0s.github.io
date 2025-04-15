@@ -5,7 +5,7 @@ import GameCard from '@/components/GameCard';
 import { games } from '@/data/games';
 import { motion } from 'framer-motion';
 import BackgroundParticles from '@/components/BackgroundParticles';
-import ToolsSection from '@/components/ToolsSection';
+import StreamingSection from '@/components/StreamingSection';
 
 const Index = () => {
   // Animation variants
@@ -57,7 +57,7 @@ const Index = () => {
         </div>
       </main>
       
-      <ToolsSection />
+      <StreamingSection />
     </div>
   );
 };
