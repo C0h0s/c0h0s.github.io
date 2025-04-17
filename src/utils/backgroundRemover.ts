@@ -62,7 +62,15 @@ export const removeBackground = async (imageUrl: string): Promise<string> => {
         const segmenter = await pipeline('image-segmentation', model, {
           quantized: device !== 'cpu', // Use quantized models when possible
           device: device as any,
-          progress_callback: (progress: number) => {
+          progress_callback: (progressInfo: any) => {
+            // Get the progress value, which might be in different formats depending on the phase
+            let progress = 0;
+            if (typeof progressInfo === 'number') {
+              progress = progressInfo;
+            } else if (progressInfo && typeof progressInfo.progress === 'number') {
+              progress = progressInfo.progress;
+            }
+            
             // Custom event for model loading progress
             const event = new CustomEvent('ai-progress', {
               detail: { 
@@ -147,12 +155,14 @@ async function detectBestDevice(): Promise<string> {
       // Use a small test to verify device capability
       if (device === 'webgpu') {
         // Check if WebGPU is available
+        // @ts-ignore - TypeScript doesn't recognize navigator.gpu yet
         if (!navigator.gpu) {
           console.log('WebGPU not available');
           continue;
         }
         
         try {
+          // @ts-ignore - TypeScript doesn't recognize navigator.gpu yet
           const adapter = await navigator.gpu.requestAdapter();
           if (!adapter) {
             console.log('WebGPU adapter not available');
