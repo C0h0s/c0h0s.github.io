@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { pipeline, env } from '@huggingface/transformers';
 
@@ -60,7 +59,6 @@ export const removeBackground = async (imageUrl: string): Promise<string> => {
         
         // Create a new segmenter with the current model
         const segmenter = await pipeline('image-segmentation', model, {
-          quantized: device !== 'cpu', // Use quantized models when possible
           device: device as any,
           progress_callback: (progressInfo: any) => {
             // Get the progress value, which might be in different formats depending on the phase
