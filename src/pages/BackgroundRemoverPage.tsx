@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ImageMinus, Upload, Download, Wand2, Loader } from 'lucide-react';
@@ -14,6 +15,7 @@ const BackgroundRemoverPage = () => {
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [processingProgress, setProcessingProgress] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,10 +32,12 @@ const BackgroundRemoverPage = () => {
       if (!validateImage(file)) return;
       
       setUploadedFile(file);
+      setProcessedImage(null);
+      
       try {
         const dataUrl = await fileToDataUrl(file);
         setOriginalImage(dataUrl);
-        setProcessedImage(null);
+        toast.success('Image uploaded successfully!');
       } catch (error) {
         toast.error('Failed to read image file');
         console.error(error);
@@ -45,19 +49,29 @@ const BackgroundRemoverPage = () => {
     if (!originalImage) return;
     
     setIsProcessing(true);
+    setProcessingProgress('Initializing AI model...');
+    
     try {
-      toast.info('Processing image...');
+      // Add event listener for model loading progress
+      const progressHandler = (event: CustomEvent) => {
+        if (event.detail && event.detail.status) {
+          setProcessingProgress(event.detail.status);
+        }
+      };
       
-      await new Promise(resolve => setTimeout(resolve, 800));
+      window.addEventListener('ai-progress', progressHandler as EventListener);
       
       const result = await removeBackground(originalImage);
       setProcessedImage(result);
+      
+      window.removeEventListener('ai-progress', progressHandler as EventListener);
       
       toast.success('Background removed successfully!');
     } catch (error) {
       console.error('Error processing image:', error);
       toast.error('Failed to process image');
     } finally {
+      setProcessingProgress('');
       setIsProcessing(false);
     }
   }, [originalImage]);
@@ -88,11 +102,11 @@ const BackgroundRemoverPage = () => {
         >
           <h1 className="text-3xl font-bold mb-4 flex items-center justify-center gap-2">
             <ImageMinus className="h-8 w-8" />
-            Background Remover Tool
+            AI Background Remover
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Remove backgrounds from your images with our AI-powered tool. 
-            Upload an image, let our AI work its magic, and download your transparent PNG.
+            Upload an image, let our advanced AI identify the subject, and download your transparent PNG.
           </p>
         </motion.div>
 
@@ -158,6 +172,20 @@ const BackgroundRemoverPage = () => {
                     Download PNG
                   </Button>
                 </div>
+
+                {isProcessing && (
+                  <div className="mt-4 p-4 bg-secondary/20 rounded-lg">
+                    <div className="flex items-center">
+                      <Loader className="animate-spin h-4 w-4 mr-2" />
+                      <p className="text-sm">
+                        {processingProgress || 'Processing your image...'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      First-time processing may take longer to download the AI model
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -192,19 +220,6 @@ const BackgroundRemoverPage = () => {
                 </div>
               )}
             </div>
-            
-            {isProcessing && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mt-4 p-4 bg-secondary/20 rounded-lg"
-              >
-                <p className="text-sm text-center">
-                  Our AI is analyzing your image to separate foreground from background. 
-                  This may take a few moments...
-                </p>
-              </motion.div>
-            )}
           </div>
         </div>
       </main>
