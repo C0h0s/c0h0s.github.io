@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, AudioWaveform, Sparkles } from 'lucide-react';
+import { ArrowRight, ImageMinus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,14 +9,14 @@ const ToolsSection = () => {
   const navigate = useNavigate();
   const sectionRef = React.useRef<HTMLDivElement>(null);
   
-  // Vocal Remover tool data with updated description
+  // Background removal tool data
   const tool = {
-    id: 'vocal-remover',
-    title: 'AI-Powered Vocal Remover & Extractor',
-    description: 'Separate vocals from instrumentals with cutting-edge AI technology. Extract ultra-pure vocals using spectral gating algorithms. Perfect for karaoke, remixes, and professional audio editing. Works with files up to 10MB.',
-    icon: <AudioWaveform size={24} />,
-    path: '/vocalremover',
-    color: 'from-purple-500 to-pink-500'
+    id: 'background-remover',
+    title: 'AI-Powered Background Remover',
+    description: 'Remove backgrounds from your images with cutting-edge AI technology. Create transparent PNGs in seconds. Perfect for product photography, profile pictures, and graphic design projects.',
+    icon: <ImageMinus size={24} />,
+    path: '/background-remover',
+    color: 'from-blue-500 to-indigo-500'
   };
 
   // Intersection observer for animation
@@ -51,8 +51,8 @@ const ToolsSection = () => {
     <section ref={sectionRef} className="py-16 px-4 bg-gaming-dark">
       <div className="container mx-auto">
         <div className="text-left mb-8 reveal">
-          <h2 className="text-2xl font-bold text-white">Audio Tools</h2>
-          <p className="text-muted-foreground">Professional audio processing powered by cutting-edge AI technology</p>
+          <h2 className="text-2xl font-bold text-white">Creative Tools</h2>
+          <p className="text-muted-foreground">Professional tools powered by cutting-edge AI technology</p>
         </div>
 
         <div className="flex justify-center">
@@ -68,7 +68,7 @@ const ToolsSection = () => {
               </div>
               <h3 className="text-lg font-medium text-white mb-2 flex items-center">
                 {tool.title}
-                <Sparkles className="ml-2 h-4 w-4 text-purple-400" />
+                <Sparkles className="ml-2 h-4 w-4 text-blue-400" />
               </h3>
               <p className="text-sm text-muted-foreground mb-4">{tool.description}</p>
               

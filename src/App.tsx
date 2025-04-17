@@ -11,8 +11,7 @@ import GameDetail from "./pages/GameDetail";
 import NotFound from "./pages/NotFound";
 import LoadingScreen from "./components/LoadingScreen";
 import VocalRemoverPage from "./pages/VocalRemoverPage";
-import StreamingPage from "./pages/StreamingPage";
-import StreamPlayer from "./pages/StreamPlayer";
+import BackgroundRemoverPage from "./pages/BackgroundRemoverPage";
 
 const queryClient = new QueryClient();
 
@@ -45,8 +44,7 @@ const App = () => {
               <Route path="/" element={<Index />} />
               <Route path="/game/:gameId" element={<GameDetail />} />
               <Route path="/vocalremover" element={<VocalRemoverPage />} />
-              <Route path="/streaming" element={<StreamingPage />} />
-              <Route path="/stream/:contentId" element={<StreamPlayer />} />
+              <Route path="/background-remover" element={<BackgroundRemoverPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </HashRouter>
