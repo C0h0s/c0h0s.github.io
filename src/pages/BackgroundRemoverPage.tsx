@@ -1,7 +1,6 @@
-
 import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ImageMinus, Upload, Download, MagicWand, Loader } from 'lucide-react';
+import { ImageMinus, Upload, Download, Wand2, Loader } from 'lucide-react';
 import { toast } from "sonner";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,14 +17,12 @@ const BackgroundRemoverPage = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Function to trigger file input click
   const handleUploadClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // Function to handle file selection
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -44,7 +41,6 @@ const BackgroundRemoverPage = () => {
     }
   };
 
-  // Function to process the image
   const processImage = useCallback(async () => {
     if (!originalImage) return;
     
@@ -52,7 +48,6 @@ const BackgroundRemoverPage = () => {
     try {
       toast.info('Processing image...');
       
-      // Add a slight delay to show the processing state
       await new Promise(resolve => setTimeout(resolve, 800));
       
       const result = await removeBackground(originalImage);
@@ -67,7 +62,6 @@ const BackgroundRemoverPage = () => {
     }
   }, [originalImage]);
   
-  // Download the processed image
   const downloadImage = () => {
     if (!processedImage) return;
     
@@ -103,11 +97,9 @@ const BackgroundRemoverPage = () => {
         </motion.div>
 
         <div className="flex flex-col md:flex-row gap-8">
-          {/* Left Side - Controls */}
           <Card className="w-full md:w-1/3 bg-secondary/20">
             <CardContent className="p-6">
               <div className="space-y-6">
-                {/* Upload Controls */}
                 <div>
                   <h3 className="text-lg font-medium mb-4">1. Upload Image</h3>
                   <input 
@@ -132,7 +124,6 @@ const BackgroundRemoverPage = () => {
                   )}
                 </div>
                 
-                {/* Process Controls */}
                 <div>
                   <h3 className="text-lg font-medium mb-4">2. Remove Background</h3>
                   <Button 
@@ -148,14 +139,13 @@ const BackgroundRemoverPage = () => {
                       </>
                     ) : (
                       <>
-                        <MagicWand className="mr-2 h-4 w-4" />
+                        <Wand2 className="mr-2 h-4 w-4" />
                         Remove Background
                       </>
                     )}
                   </Button>
                 </div>
                 
-                {/* Download Controls */}
                 <div>
                   <h3 className="text-lg font-medium mb-4">3. Download Result</h3>
                   <Button 
@@ -172,7 +162,6 @@ const BackgroundRemoverPage = () => {
             </CardContent>
           </Card>
           
-          {/* Right Side - Image Preview */}
           <div className="w-full md:w-2/3">
             <div className="bg-secondary/10 rounded-xl flex items-center justify-center h-[400px] md:h-[500px] overflow-hidden">
               {!originalImage ? (
@@ -204,7 +193,6 @@ const BackgroundRemoverPage = () => {
               )}
             </div>
             
-            {/* Processing information */}
             {isProcessing && (
               <motion.div 
                 initial={{ opacity: 0 }}
