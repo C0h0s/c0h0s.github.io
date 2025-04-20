@@ -12,7 +12,7 @@ export const games: Game[] = [
     id: 'subway-surfers',
     title: 'Subway Surfers',
     thumbnail: 'https://play-lh.googleusercontent.com/JzFSE6MI0F_5bWcyYLXma-BiCRfRrhh1Of1qZizM3DenOa8v_1mnNiO0BoOFOAIScDA',
-    url: 'https://yell0wsuit.page/assets/games/subway-surfers/index.html',
+    url: 'https://yell0wsuit.page/assets/games/subway-surfers/index.html?theme=193-hongkong',
     category: 'Endless Runner'
   },
   {
