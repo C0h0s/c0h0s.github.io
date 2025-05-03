@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import LoadingScreen from "./components/LoadingScreen";
 import VocalRemoverPage from "./pages/VocalRemoverPage";
 import BackgroundRemoverPage from "./pages/BackgroundRemoverPage";
+import YoutubeDownloaderPage from "./pages/YoutubeDownloaderPage";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => {
               <Route path="/game/:gameId" element={<GameDetail />} />
               <Route path="/vocalremover" element={<VocalRemoverPage />} />
               <Route path="/background-remover" element={<BackgroundRemoverPage />} />
+              <Route path="/youtube-downloader" element={<YoutubeDownloaderPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </HashRouter>
