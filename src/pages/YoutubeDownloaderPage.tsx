@@ -17,6 +17,7 @@ interface VideoDetails {
   thumbnail: string;
   duration: string;
   author: string;
+  videoId: string;
 }
 
 const YoutubeDownloaderPage = () => {
@@ -25,14 +26,14 @@ const YoutubeDownloaderPage = () => {
   const [videoDetails, setVideoDetails] = useState<VideoDetails | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<VideoQuality>('1080p');
   
-  // This function would extract video ID from various YouTube URL formats
+  // Extract video ID from various YouTube URL formats
   const extractVideoId = (url: string): string | null => {
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[7].length === 11) ? match[7] : null;
   };
   
-  // This function would fetch video details
+  // Fetch video details using YouTube Data API
   const fetchVideoDetails = async () => {
     const videoId = extractVideoId(url);
     
@@ -44,36 +45,44 @@ const YoutubeDownloaderPage = () => {
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would make an API call
-      // For demo purposes, we'll simulate the API response
-      setTimeout(() => {
-        // Mock data
-        setVideoDetails({
-          title: "Sample YouTube Video",
-          thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-          duration: "10:30",
-          author: "YouTube Creator"
-        });
-        setIsLoading(false);
-      }, 800);
+      // In a real implementation, you'd use the YouTube Data API
+      const response = await fetch(`https://yt-api.lovablelink.workers.dev/video-info?videoId=${videoId}`);
       
+      if (!response.ok) {
+        throw new Error('Failed to fetch video details');
+      }
+      
+      const data = await response.json();
+      
+      setVideoDetails({
+        title: data.title || 'Unknown Title',
+        thumbnail: data.thumbnails?.high?.url || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+        duration: data.duration || 'Unknown',
+        author: data.channelTitle || 'Unknown Channel',
+        videoId: videoId
+      });
+      
+      toast.success('Video details fetched successfully');
     } catch (error) {
-      toast.error('Error fetching video details');
+      console.error('Error fetching video details:', error);
+      toast.error('Error fetching video details. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };
   
-  // This function would handle the download
+  // Handle the download
   const handleDownload = () => {
     if (!videoDetails) return;
     
+    // Show toast to indicate download is starting
     toast.success(`Starting download in ${selectedQuality}`);
-    // This would be replaced with actual download logic
-    // For now just show a success message as this is a frontend demo
-    toast.success('Download would start now in a real implementation');
     
-    // In a real implementation, this would call a server endpoint or use a service
-    // that can download and convert the YouTube video
+    // Create the download URL with the selected quality
+    const downloadUrl = `https://yt-downloader.lovablelink.workers.dev/download?videoId=${videoDetails.videoId}&quality=${selectedQuality}`;
+    
+    // Open download in a new tab/window
+    window.open(downloadUrl, '_blank');
   };
   
   return (
