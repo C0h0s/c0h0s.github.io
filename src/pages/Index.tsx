@@ -28,10 +28,8 @@ const Index = () => {
     }
   };
 
-  // Get the latest 9 added games (the new ones) and put them first
-  const newGames = games.slice(0, 9); // The 9 newly added games
-  const oldGames = games.slice(9); // All previous games
-  const featuredGames = [...newGames, ...oldGames];
+  // The new games are already at the top of the games array (first 9)
+  const featuredGames = games;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
