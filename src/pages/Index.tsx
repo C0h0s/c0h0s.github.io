@@ -28,9 +28,9 @@ const Index = () => {
     }
   };
 
-  // Get the latest 6 added games (the new ones) and put them first
-  const newGames = games.slice(games.length - 6);
-  const oldGames = games.slice(0, games.length - 6);
+  // Get the latest 9 added games (the new ones) and put them first
+  const newGames = games.slice(0, 9); // The 9 newly added games
+  const oldGames = games.slice(9); // All previous games
   const featuredGames = [...newGames, ...oldGames];
 
   return (

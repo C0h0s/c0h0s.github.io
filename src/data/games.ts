@@ -8,6 +8,69 @@ export interface Game {
 
 export const games: Game[] = [
   {
+    id: 'fnaf',
+    title: 'Five Nights at Freddy\'s',
+    thumbnail: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSce_FeuKrP0Sl2exfWhW1Tr2D3s6NtskOhIw&s',
+    url: 'https://mathtestprep.pages.dev/games/fnaf/gamescode',
+    category: 'Horror'
+  },
+  {
+    id: 'bad-piggies',
+    title: 'Bad Piggies',
+    thumbnail: 'https://play-lh.googleusercontent.com/WUXuQ9MrEYeU-blZesAEqdIIQv03OknruPCrNQGOxXop1pFZai0BWT4kKUqaz_rcpRiB',
+    url: 'https://tino.pages.dev/badpiggies/',
+    category: 'Puzzle'
+  },
+  {
+    id: 'fnaf-2',
+    title: 'Five Nights at Freddy\'s 2',
+    thumbnail: 'https://static.wikia.nocookie.net/fivenightsatfreddys/images/b/b3/480px-Five_Nights_at_Freddy%27s_2_icon.jpg/revision/latest?cb=20141102170003',
+    url: 'https://tino.pages.dev/fnaf2/',
+    category: 'Horror'
+  },
+  {
+    id: 'super-mario-64',
+    title: 'Super Mario 64',
+    thumbnail: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ9CCrPbSRaprdjEPHnIHaAvy_fGk7Ll4R4dQ&s',
+    url: 'https://tino.pages.dev/supermario64/',
+    category: 'Platformer'
+  },
+  {
+    id: 'osu',
+    title: 'Osu!',
+    thumbnail: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Osu%21_Logo_2016.svg/800px-Osu%21_Logo_2016.svg.png',
+    url: 'https://tino.pages.dev/osu/',
+    category: 'Rhythm'
+  },
+  {
+    id: 'btd3',
+    title: 'Bloons Tower Defense 3',
+    thumbnail: 'https://tino.pages.dev/btd3/icon.png',
+    url: 'https://tino.pages.dev/btd3/',
+    category: 'Tower Defense'
+  },
+  {
+    id: 'btd4',
+    title: 'Bloons Tower Defense 4',
+    thumbnail: 'https://tino.pages.dev/btd4/logo.jpg',
+    url: 'https://tino.pages.dev/btd4/',
+    category: 'Tower Defense'
+  },
+  {
+    id: 'btd5',
+    title: 'Bloons Tower Defense 5',
+    thumbnail: 'https://tino.pages.dev/btd5/wogo.png',
+    url: 'https://tino.pages.dev/btd5/',
+    category: 'Tower Defense'
+  },
+  {
+    id: 'btd6',
+    title: 'Bloons Tower Defense 6',
+    thumbnail: 'https://tino.pages.dev/btd6/uwu.png',
+    url: 'https://tino.pages.dev/btd6/',
+    category: 'Tower Defense'
+  },
+  {
     id: 'subway-surfers',
     title: 'Subway Surfers',
     thumbnail: 'https://play-lh.googleusercontent.com/JzFSE6MI0F_5bWcyYLXma-BiCRfRrhh1Of1qZizM3DenOa8v_1mnNiO0BoOFOAIScDA',
