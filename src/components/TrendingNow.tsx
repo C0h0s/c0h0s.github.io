@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import { games } from '@/data/games';
 
 interface TrendingGameProps {
   id: string;
@@ -12,8 +13,20 @@ interface TrendingGameProps {
 }
 
 const TrendingGame = ({ id, title, thumbnail, players, index }: TrendingGameProps) => {
+  // Function to open game in new tab
+  const openGameInNewTab = () => {
+    const gameData = games.find(g => g.id === id);
+    if (gameData && gameData.url) {
+      window.open(gameData.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
-    <div className={`flex items-center space-x-4 p-3 rounded-lg transition-all duration-300 hover:bg-secondary reveal`} style={{ transitionDelay: `${index * 100}ms` }}>
+    <div 
+      className={`flex items-center space-x-4 p-3 rounded-lg transition-all duration-300 hover:bg-secondary reveal cursor-pointer`} 
+      style={{ transitionDelay: `${index * 100}ms` }}
+      onClick={openGameInNewTab}
+    >
       <div className="relative flex-shrink-0">
         <div className="bg-gaming-purple w-6 h-6 rounded-full absolute -left-2 -top-2 flex items-center justify-center text-sm font-bold text-white">
           {index + 1}
@@ -31,38 +44,11 @@ const TrendingGame = ({ id, title, thumbnail, players, index }: TrendingGameProp
   );
 };
 
-const trendingGames = [
-  {
-    id: '1',
-    title: 'Space Odyssey',
-    thumbnail: 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131',
-    players: '12,452'
-  },
-  {
-    id: '2',
-    title: 'Pixel Jumper',
-    thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f',
-    players: '8,921'
-  },
-  {
-    id: '3',
-    title: 'Monster Hunter',
-    thumbnail: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5',
-    players: '7,822'
-  },
-  {
-    id: '4',
-    title: 'Car Racer 3D',
-    thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420',
-    players: '6,547'
-  },
-  {
-    id: '5',
-    title: 'Fruit Slice',
-    thumbnail: 'https://images.unsplash.com/photo-1559511260-66a654ae982a',
-    players: '5,936'
-  }
-];
+// Get 5 popular games for trending section with mock player counts
+const trendingGames = games.slice(0, 5).map((game, index) => ({
+  ...game,
+  players: `${Math.floor(Math.random() * 10000 + 5000).toLocaleString()}`
+}));
 
 const TrendingNow = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
