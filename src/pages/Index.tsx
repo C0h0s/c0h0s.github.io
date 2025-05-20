@@ -6,8 +6,6 @@ import { games } from '@/data/games';
 import { motion } from 'framer-motion';
 import BackgroundParticles from '@/components/BackgroundParticles';
 import WebsitesSection from '@/components/WebsitesSection';
-import GamesGrid from '@/components/GamesGrid';
-import TrendingNow from '@/components/TrendingNow';
 
 const Index = () => {
   // Animation variants
@@ -30,6 +28,11 @@ const Index = () => {
     }
   };
 
+  // Get the latest 6 added games (the new ones) and put them first
+  const newGames = games.slice(games.length - 6);
+  const oldGames = games.slice(0, games.length - 6);
+  const featuredGames = [...newGames, ...oldGames];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <BackgroundParticles />
@@ -44,7 +47,7 @@ const Index = () => {
             initial="hidden"
             animate="visible"
           >
-            {games.map((game, index) => (
+            {featuredGames.map((game, index) => (
               <motion.div key={game.id} variants={itemVariants}>
                 <GameCard
                   id={game.id}
@@ -59,8 +62,6 @@ const Index = () => {
         </div>
       </main>
       
-      <GamesGrid />
-      <TrendingNow />
       <WebsitesSection />
     </div>
   );
