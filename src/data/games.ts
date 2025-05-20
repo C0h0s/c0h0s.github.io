@@ -1,4 +1,3 @@
-
 export interface Game {
   id: string;
   title: string;
@@ -182,5 +181,47 @@ export const games: Game[] = [
     thumbnail: 'https://img.cdn.famobi.com/portal/html5games/images/tmp/120/TimberManTeaser.jpg',
     url: 'https://play.famobi.com/timber-man',
     category: 'Action'
+  },
+  {
+    id: 'getting-over-it',
+    title: 'Getting Over It',
+    thumbnail: 'https://play-lh.googleusercontent.com/xEDOZ9oZZrHswGxUR3w55e4XL9nF2r9HQpmpBO2iGsX3EbCstxawIpZB-EykrCPl6c0',
+    url: 'https://subwaysurf.io/getting-over-it-unblocked',
+    category: 'Platformer'
+  },
+  {
+    id: 'pacman',
+    title: 'Pacman',
+    thumbnail: 'https://i.pinimg.com/474x/64/48/dd/6448ddbd782a0580e55173497b9fa162.jpg',
+    url: 'https://yell0wsuit.page/assets/games/pacman-google/index.html',
+    category: 'Classic'
+  },
+  {
+    id: 'mario-fps',
+    title: 'Mario FPS',
+    thumbnail: 'https://funhtml5games.com/images/mariofps.png',
+    url: 'https://funhtml5games.com/?embed=mariofps',
+    category: 'FPS'
+  },
+  {
+    id: 'pokemon-ninja',
+    title: 'Pokemon Ninja',
+    thumbnail: 'https://funhtml5games.com/images/pokeninja.png',
+    url: 'https://funhtml5games.com/?play=pokeninja',
+    category: 'Action'
+  },
+  {
+    id: 'minion-kart',
+    title: 'Minion Kart',
+    thumbnail: 'https://funhtml5games.com/images/minionkart.png',
+    url: 'https://funhtml5games.com/?embed=minionkart',
+    category: 'Racing'
+  },
+  {
+    id: 'angry-birds-trump',
+    title: 'Angry Birds: Trump vs Mexicans',
+    thumbnail: 'https://funhtml5games.com/images/angrymex.png',
+    url: 'https://funhtml5games.com/?embed=angrymex',
+    category: 'Puzzle'
   }
 ];
