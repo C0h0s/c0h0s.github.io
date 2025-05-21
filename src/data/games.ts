@@ -1,3 +1,4 @@
+
 export interface Game {
   id: string;
   title: string;
@@ -7,6 +8,13 @@ export interface Game {
 }
 
 export const games: Game[] = [
+  {
+    id: 'worlds-easiest-game',
+    title: 'World\'s Easiest Game',
+    thumbnail: 'https://img.itch.zone/aW1nLzI0NzMwODQucG5n/315x250%23c/nlQJUm.png',
+    url: 'https://worlds-easiest-game.vercel.app/',
+    category: 'Puzzle'
+  },
   {
     id: 'fnaf',
     title: 'Five Nights at Freddy\'s',
