@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Download, Youtube } from 'lucide-react';
+import { ExternalLink, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,11 +17,11 @@ const WebsitesSection = () => {
       icon: <ExternalLink className="h-6 w-6 text-white" />
     },
     {
-      title: "YouTube to MP4",
-      description: "Download YouTube videos in high quality up to 1080p without ads.",
-      url: "/youtube-downloader",
-      color: "from-red-500 to-orange-500",
-      icon: <Youtube className="h-6 w-6 text-white" />,
+      title: "Unblock Websites",
+      description: "Access blocked websites through our secure proxy service.",
+      url: "/unblock",
+      color: "from-blue-500 to-cyan-500",
+      icon: <Shield className="h-6 w-6 text-white" />,
       isInternal: true
     }
   ];
