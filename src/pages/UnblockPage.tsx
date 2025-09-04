@@ -1,45 +1,24 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Navbar from '@/components/Navbar';
 import { ExternalLink, Shield, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
 const UnblockPage = () => {
-  const [url, setUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const handleUnblock = () => {
-    if (!url.trim()) {
-      toast.error('Please enter a URL');
-      return;
-    }
-
-    // Add protocol if missing
-    let formattedUrl = url.trim();
-    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
-      formattedUrl = 'https://' + formattedUrl;
-    }
-
     setIsLoading(true);
     
     try {
-      // Open the unblock service with the URL
-      const unblockUrl = `https://nebulaservices.org/en_US/${encodeURIComponent(formattedUrl)}`;
-      window.open(unblockUrl, '_blank', 'noopener,noreferrer');
-      toast.success('Opening unblocked link in new window');
+      window.open('https://nebulaservices.org/en_US/', '_blank', 'noopener,noreferrer');
+      toast.success('Opening unblock service in new window');
     } catch (error) {
       toast.error('Failed to open unblock service');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleUnblock();
     }
   };
 
@@ -77,27 +56,18 @@ const UnblockPage = () => {
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Globe className="h-5 w-5" />
-                  Enter Website URL
+                  Access Blocked Websites
                 </CardTitle>
                 <CardDescription className="text-gaming-text">
-                  Enter the URL of the website you want to access
+                  Click the button below to open our unblock service
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Input
-                    type="url"
-                    placeholder="https://example.com"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="flex-1 bg-gaming-dark border-gaming-border text-white placeholder:text-gaming-text"
-                    disabled={isLoading}
-                  />
+                <div className="flex justify-center">
                   <Button 
                     onClick={handleUnblock}
-                    disabled={isLoading || !url.trim()}
-                    className="px-6"
+                    disabled={isLoading}
+                    className="px-8 py-3"
                   >
                     {isLoading ? (
                       <motion.div
@@ -108,19 +78,10 @@ const UnblockPage = () => {
                     ) : (
                       <>
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Unblock
+                        Open Unblock Service
                       </>
                     )}
                   </Button>
-                </div>
-                
-                <div className="text-sm text-gaming-text">
-                  <p className="mb-2">Examples:</p>
-                  <ul className="list-disc list-inside space-y-1 text-xs">
-                    <li>youtube.com</li>
-                    <li>twitter.com</li>
-                    <li>instagram.com</li>
-                  </ul>
                 </div>
               </CardContent>
             </Card>
@@ -137,19 +98,19 @@ const UnblockPage = () => {
                   <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-white text-sm font-bold">1</span>
                   </div>
-                  <p>Enter the website URL you want to access</p>
+                  <p>Click the "Open Unblock Service" button</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-white text-sm font-bold">2</span>
                   </div>
-                  <p>Click "Unblock" to open the site through our proxy service</p>
+                  <p>The unblock service will open in a new window</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-white text-sm font-bold">3</span>
                   </div>
-                  <p>Access the website in a new tab, bypassing restrictions</p>
+                  <p>Enter any website URL in the service to bypass restrictions</p>
                 </div>
               </div>
             </motion.div>
