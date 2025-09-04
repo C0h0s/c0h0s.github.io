@@ -55,65 +55,34 @@ const UnblockPage = () => {
             <Card className="bg-gaming-card border-gaming-border">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  Access Blocked Websites
+                  <Shield className="h-5 w-5" />
+                  Unblock Websites
                 </CardTitle>
                 <CardDescription className="text-gaming-text">
-                  Click the button below to open our unblock service
+                  Access blocked websites through our service
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-center">
-                  <Button 
-                    onClick={handleUnblock}
-                    disabled={isLoading}
-                    className="px-8 py-3"
-                  >
-                    {isLoading ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="h-4 w-4 border-2 border-white border-t-transparent rounded-full"
-                      />
-                    ) : (
-                      <>
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Open Unblock Service
-                      </>
-                    )}
-                  </Button>
-                </div>
+              <CardContent className="flex justify-center">
+                <Button 
+                  onClick={handleUnblock}
+                  disabled={isLoading}
+                  className="px-8 py-4 text-lg"
+                >
+                  {isLoading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="h-5 w-5 border-2 border-white border-t-transparent rounded-full"
+                    />
+                  ) : (
+                    <>
+                      <ExternalLink className="h-5 w-5 mr-2" />
+                      Open Unblock Service
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-8 bg-gaming-card border border-gaming-border rounded-lg p-6"
-            >
-              <h2 className="text-xl font-semibold text-white mb-4">How it works</h2>
-              <div className="space-y-3 text-gaming-text">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-sm font-bold">1</span>
-                  </div>
-                  <p>Click the "Open Unblock Service" button</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-sm font-bold">2</span>
-                  </div>
-                  <p>The unblock service will open in a new window</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-sm font-bold">3</span>
-                  </div>
-                  <p>Enter any website URL in the service to bypass restrictions</p>
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         </div>
       </main>
