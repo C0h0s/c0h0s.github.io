@@ -27,7 +27,7 @@ const UnblockPage = () => {
     
     try {
       // Open the unblock service with the URL
-      const unblockUrl = `https://us8.unblock-websites.com/${encodeURIComponent(formattedUrl)}`;
+      const unblockUrl = `https://nebulaservices.org/en_US/${encodeURIComponent(formattedUrl)}`;
       window.open(unblockUrl, '_blank', 'noopener,noreferrer');
       toast.success('Opening unblocked link in new window');
     } catch (error) {
