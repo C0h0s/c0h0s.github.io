@@ -1,1 +1,4 @@
 project_id = "scvyiydynbccjvwcjriy"
+
+[functions.ai-game-recommender]
+verify_jwt = false
