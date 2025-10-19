@@ -1,18 +1,38 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, LogIn, LogOut, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { games } from '@/data/games';
-import { useNavigate } from 'react-router-dom';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 const Navbar = () => {
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [onlineUsers, setOnlineUsers] = useState(1); // Start with 1 (current user)
+  const [onlineUsers, setOnlineUsers] = useState(1);
   const [searchResults, setSearchResults] = useState<typeof games>([]);
-  const navigate = useNavigate();
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+
+  // Check authentication status
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Effect for search functionality
   useEffect(() => {
@@ -75,6 +95,22 @@ const Navbar = () => {
     setSearchOpen(false);
     setSearchQuery('');
     navigate(`/game/${gameId}`);
+  };
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Logged out",
+        description: "You've been successfully logged out.",
+      });
+    }
   };
 
   return (
@@ -160,6 +196,29 @@ const Navbar = () => {
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-sm text-white">{onlineUsers} online</span>
           </div>
+
+          {/* Auth Buttons */}
+          {user ? (
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="border-gaming-border hover:bg-gaming-card"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          ) : (
+            <Button
+              onClick={() => navigate('/auth')}
+              variant="outline"
+              size="sm"
+              className="border-gaming-border hover:bg-gaming-card"
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Login
+            </Button>
+          )}
         </div>
       </div>
     </nav>

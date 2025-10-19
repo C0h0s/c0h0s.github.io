@@ -13,6 +13,7 @@ import LoadingScreen from "./components/LoadingScreen";
 import VocalRemoverPage from "./pages/VocalRemoverPage";
 import BackgroundRemoverPage from "./pages/BackgroundRemoverPage";
 import UnblockPage from "./pages/UnblockPage";
+import Auth from "./pages/Auth";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => {
           <HashRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="/game/:gameId" element={<GameDetail />} />
               <Route path="/vocalremover" element={<VocalRemoverPage />} />
               <Route path="/background-remover" element={<BackgroundRemoverPage />} />
